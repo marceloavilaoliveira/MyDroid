@@ -4,184 +4,123 @@
 //            MyDroid.ino - Android Figure Control using Arduino              //
 //============================================================================//
 
-#include <IRremote.h>
-#include <Servo.h> 
+//============================================================================//
+// DEFINITIONS                                                                //
+//============================================================================//
 
+// TURN ON DEBUG MODE
+// #define DEBUG
+// ADD INFRARED REMOTE SUPPORT
+// #define IR
+
+//============================================================================//
+// LIBRARIES                                                                  //
+//============================================================================//
+
+// IR LIBRARY
+#ifdef IR
+  #include <IRremote.h>
+#endif
+// SERVO LIBRARY
+#include <Servo.h>
+
+//============================================================================//
+// VARIABLES                                                                  //
+//============================================================================//
+
+// MOTORS
 Servo motor1;
 Servo motor2;
 Servo motor3;
 Servo motor4;
 
+// PINS
 int head_pin = 24;
 int body_pin = 26;
 int left_arm_pin = 28;
 int right_arm_pin = 30;
-int right_blue_eye_pin = 6;
-int right_red_eye_pin = 7;
+int right_blue_eye_pin = 9;
+int right_red_eye_pin = 10;
 int left_blue_eye_pin =11;
 int left_red_eye_pin = 12;
 
-int step_aux = 5;
-int blink_num = 0;
-int time_to_blink = 35;
-int auto_move_num;
-int time_to_auto_move;
-int remote_button;
-boolean auto_move = false;
-
+// POSITIONS
 int head_pos;
 int body_pos;
 int left_arm_pos;
 int right_arm_pos;
 
-IRrecv irrecv(22);
+// TIME
+unsigned long current_time;
+unsigned long previous_time = 0;
+unsigned long time_to_blink = 3000;
 
-decode_results results;
+// MISCELANEOUS
+int step_aux = 5;
+int step_aux_2 = 10;
+int option;
+
+// IR
+#ifdef IR
+  IRrecv irrecv(22);
+  decode_results results;
+#endif
+
+//============================================================================//
+// FUNCTIONS (SETUP)                                                          //
+//============================================================================//
 
 void setup() {
-  Serial.begin(9600);
+  #ifdef DEBUG
+    Serial.begin(9600);
+  #endif
+
+  #ifdef IR
+    irrecv.enableIRIn();
+  #endif
+
   randomSeed(analogRead(0));
-  irrecv.enableIRIn();
+  setup_bluetooth();
   reset(0);
 }
 
-void blink_eye() {
-  analogWrite(right_blue_eye_pin, 220);
-  analogWrite(left_blue_eye_pin, 220);
+void setup_bluetooth()
+{
+  Serial1.begin(38400);                    // Set baud rate
+  Serial1.print("\r\n+STWMOD=0\r\n");      // Set to work in slave mode
+  Serial1.print("\r\n+STNA=Avila147\r\n"); // Set name"
+  Serial1.print("\r\n+STOAUT=1\r\n");      // Permit Paired device to connect me
+  Serial1.print("\r\n+STAUTO=0\r\n");      // Auto-connection should be forbidden here
+  delay(2000);                             // This delay is required.
+  Serial1.print("\r\n+INQ=1\r\n");         // Make the slave inquirable 
+  delay(2000);                             // This delay is required.
+  while (Serial1.available()) {            // Clear data
+    Serial1.read();
+  }
+}
+
+//============================================================================//
+// FUNCTIONS (BASIC ACTIONS)                                                  //
+//============================================================================//
+
+void blink_eyes() {
+  analogWrite(right_blue_eye_pin, 200);
+  analogWrite(left_blue_eye_pin, 200);
   delay(50);
   analogWrite(right_blue_eye_pin, 255);
   analogWrite(left_blue_eye_pin, 255);
-  delay(200);
+  delay(300);
   analogWrite(right_blue_eye_pin, 240);
   analogWrite(left_blue_eye_pin, 240);
 }
 
-void bye() {
-  move(true, 10, right_arm_pin, right_arm_pos, 160, head_pin, head_pos, 60, 0, 0, 0, 0, 0, 0);
-  analogWrite(left_blue_eye_pin, 255);
-  move(true, 10, right_arm_pin, 160, 120, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-  move(true, 10, right_arm_pin, 120, 160, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-  move(true, 10, right_arm_pin, 160, 120, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-  move(true, 10, right_arm_pin, 120, 160, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-  analogWrite(left_blue_eye_pin, 240);
-  delay(500);
-  move(true, 30, right_arm_pin, 170, right_arm_pos, head_pin, 60, head_pos, 0, 0, 0, 0, 0, 0);
-}
-
-void check() {
-  move(true, 30, head_pin, head_pos, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-  move(true, 30, head_pin, 10, 170, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-  move(true, 30, head_pin, 170, head_pos, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-
-  move(true, 30, body_pin, body_pos, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-  move(true, 30, body_pin, 10, 170, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-  move(true, 30, body_pin, 170, body_pos, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-
-  move(true, 30, right_arm_pin, right_arm_pos, 170, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-  move(true, 30, right_arm_pin, 170, right_arm_pos, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-
-  move(true, 30, left_arm_pin, left_arm_pos, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-  move(true, 30, left_arm_pin, 0, left_arm_pos, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-
-  analogWrite(right_red_eye_pin, 255);  
-  analogWrite(left_red_eye_pin, 255);         
-  analogWrite(right_blue_eye_pin, 255);
-  analogWrite(left_blue_eye_pin, 255);
-  delay(300);
-  analogWrite(right_red_eye_pin, 240);  
-  analogWrite(left_red_eye_pin, 240);         
-  delay(300);
-  analogWrite(right_red_eye_pin, 255);  
-  analogWrite(left_red_eye_pin, 255);         
-  analogWrite(right_blue_eye_pin, 240);
-  analogWrite(left_blue_eye_pin, 240);
-}
-
-void dance() {
-  int pos1;
-  int pos2;
-  move(true, 10, head_pin, head_pos, 90, body_pin, body_pos, 90, right_arm_pin, right_arm_pos, 0, left_arm_pin, left_arm_pos, 160);
-  move(true, 20, right_arm_pin, 0, 120, left_arm_pin, 160, 60, 0, 0, 0, 0, 0, 0);
-  pos2 = 90;
-  for (int i = 0; i < 7; i++) {
-    pos1 = pos2;
-    pos2 = pos1 - 5 * (i + 1);
-    move(true, 20, right_arm_pin, 120, 60, left_arm_pin, 120, 60, body_pin, pos1, pos2, 0, 0, 0);
-    pos1 = pos2;
-    pos2 = pos1 - 5 * (i + 1);
-    move(true, 20, right_arm_pin, 60, 120, left_arm_pin, 60, 120, body_pin, pos1, pos2, 0, 0, 0);
+void check_blink() {
+  current_time = millis();
+  if (current_time - previous_time > time_to_blink) {
+    previous_time = current_time;
+    time_to_blink = random(2000, 7000);
+    blink_eyes();
   }
-
-  shine_blue(300);
-  move(true, 20, right_arm_pin, 120, right_arm_pos, left_arm_pin, 120, left_arm_pos, head_pin, 60, head_pos, 0, 0, 0);
-
-}
-
-void dance_2() {
-  int head1 = 90;
-  int head2;
-  int body1 = 90;
-  int body2;
-  int left_arm1 = 90;
-  int left_arm2;
-  int right_arm1 = 70;
-  int right_arm2;
-
-  move(true, 30, head_pin, head_pos, 90, body_pin, body_pos, 90, left_arm_pin, left_arm_pos, 70, right_arm_pin, right_arm_pos, 90);
-  delay(500);
-
-  for (int i = 0; i < 20; i++) {
-    body2 = step_aux * random(int(50 / step_aux + 1), int(80 / step_aux + 1));
-    head2 = 90 + 2 * (90 - body2);
-    right_arm2 = step_aux * random(int(30 / step_aux + 1), int(80 / step_aux + 1));
-    left_arm2 = right_arm2 - 10;
-
-    analogWrite(right_blue_eye_pin, 255);  
-    analogWrite(left_blue_eye_pin, 255);         
-
-    move(false, 30, head_pin, head1, head2, body_pin, body1, body2, left_arm_pin, left_arm1, left_arm2, right_arm_pin, right_arm1, right_arm2);
-
-    head1 = head2;
-    body1 = body2;
-    right_arm1 = right_arm2;
-    left_arm1 = left_arm2;
- 
-    body2 = step_aux * random(int(100 / step_aux + 1), int(130 / step_aux + 1));
-    head2 = 90 + 2 * (90 - body2);
-    right_arm2 = step_aux * random(int(100 / step_aux + 1), int(150 / step_aux + 1));
-    left_arm2 = right_arm2 - 10;
-
-    analogWrite(right_blue_eye_pin, 240);  
-    analogWrite(left_blue_eye_pin, 240);         
-
-    move(false, 30, head_pin, head1, head2, body_pin, body1, body2, left_arm_pin, left_arm1, left_arm2, right_arm_pin, right_arm1, right_arm2);
-
-    head1 = head2;
-    body1 = body2;
-    right_arm1 = right_arm2;
-    left_arm1 = left_arm2;
- }
-
-  analogWrite(right_blue_eye_pin, 240);  
-  analogWrite(left_blue_eye_pin, 240);         
-
-  move(true, 30, head_pin, head1, 90, body_pin, body1, 90, left_arm_pin, left_arm1, 70, right_arm_pin, right_arm1, 90);
-  delay(500);
-  move(true, 30, head_pin, 90, head_pos, body_pin, 90, body_pos, left_arm_pin, 70, left_arm_pos, right_arm_pin, 90, right_arm_pos);
-}
-
-void look_left() {
-  move(true, 10, head_pin, head_pos, 130, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-  shine_blue(300);
-  delay(500);
-  move(true, 30, head_pin, 130, head_pos, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-}
-
-void look_right() {
-  move(true, 10, head_pin, head_pos, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-  shine_blue(300);
-  delay(500);
-  move(true, 30, head_pin, 50, head_pos, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 }
 
 void move(boolean wait, int time, int pin1, int pos1, int new_pos1, int pin2, int pos2, int new_pos2, int pin3, int pos3, int new_pos3, int pin4, int pos4, int new_pos4) {
@@ -193,21 +132,25 @@ void move(boolean wait, int time, int pin1, int pos1, int new_pos1, int pin2, in
 
   if (pin1 != 0) {
     motor1.attach(pin1);
+    motor1.write(pos1);
   } else {
     continue1 = false;
   }
   if (pin2 != 0) {
     motor2.attach(pin2);
+    motor2.write(pos2);
   } else {
     continue2 = false;
   }
   if (pin3 != 0) {
     motor3.attach(pin3);
+    motor3.write(pos3);
   } else {
     continue3 = false;
   }
   if (pin4 != 0) {
     motor4.attach(pin4);
+    motor4.write(pos4);
   } else {
     continue4 = false;
   }
@@ -262,7 +205,7 @@ void move(boolean wait, int time, int pin1, int pos1, int new_pos1, int pin2, in
         } else {
           pos4 -= step_aux;
         }
-        motor4.write(pos4);
+         motor4.write(pos4);
         moved = true;
       }
     }
@@ -291,98 +234,11 @@ void move(boolean wait, int time, int pin1, int pos1, int new_pos1, int pin2, in
   }
 }
 
-void move_auto() {
-  int old_head_pos = head_pos;
-  int old_body_pos = body_pos;
-  int old_left_arm_pos = left_arm_pos;
-  int old_right_arm_pos = right_arm_pos;
-  int time_to_move = random(30, 121);
-  head_pos = step_aux * random(int(30 / step_aux + 1), int(150 / step_aux + 1));
-  body_pos = step_aux * random(int(30 / step_aux + 1), int(150 / step_aux + 1));
-  left_arm_pos = step_aux * random(0, int(160 / step_aux + 1));
-  right_arm_pos = step_aux * random(0, int(170 / step_aux + 1));
-
-  move(false, time_to_move, head_pin, old_head_pos, head_pos, body_pin, old_body_pos, body_pos, right_arm_pin, old_right_arm_pos, right_arm_pos, left_arm_pin, old_left_arm_pos, left_arm_pos);
-}
-
-void move_auto_2() {
-  int new_head_pos;
-  int new_body_pos;
-  int new_left_arm_pos;
-  int new_right_arm_pos;
-  int time_to_move_1 = random(30, 101);
-  int time_to_move_2 = random(30, 101);
-  int time_to_stay = random(10, 501);
-
-  new_head_pos = step_aux * random(int(30 / step_aux + 1), int(150 / step_aux + 1));
-  if (random(1,4) == 1) {
-    new_body_pos = step_aux * random(int(30 / step_aux + 1), int(150 / step_aux + 1));
-  } else {
-    new_body_pos = body_pos;
-  }
-  if (random(1,4) == 1) {
-    new_left_arm_pos = step_aux * random(0, int(160 / step_aux + 1));
-  } else {
-    new_left_arm_pos = left_arm_pos;
-  }
-  if (random(1,4) == 1) {
-    new_right_arm_pos = step_aux * random(0, int(170 / step_aux + 1));
-  } else {
-    new_right_arm_pos = right_arm_pos;
-  }
-
-  move(true, time_to_move_1, head_pin, head_pos, new_head_pos, body_pin, body_pos, new_body_pos, right_arm_pin, right_arm_pos, new_right_arm_pos, left_arm_pin, left_arm_pos, new_left_arm_pos);
-  delay(time_to_stay);
-  move(true, time_to_move_2, head_pin, new_head_pos, head_pos, body_pin, new_body_pos, body_pos, right_arm_pin, new_right_arm_pos, right_arm_pos, left_arm_pin, new_left_arm_pos, left_arm_pos);
-}
-
-void point_right() {
-  move(false, 50, head_pin, head_pos, 170, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-  move(false, 50, head_pin, 170, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-  move(true, 10, head_pin, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-  delay(500);
-  move(true, 10, head_pin, 50, 90, body_pin, body_pos, 50, right_arm_pin, right_arm_pos, 90, 0, 0, 0);
-  analogWrite(right_blue_eye_pin, 255);
-  analogWrite(left_blue_eye_pin, 255);
-  for (int i = 0; i < 7; i++) {
-    analogWrite(right_red_eye_pin, 100);
-    analogWrite(left_red_eye_pin, 100);
-    delay(100);
-    analogWrite(right_red_eye_pin, 240);
-    analogWrite(left_red_eye_pin, 240);
-    delay(100);
-  }
-  analogWrite(right_red_eye_pin, 255);  
-  analogWrite(left_red_eye_pin, 255);         
-  analogWrite(right_blue_eye_pin, 240);
-  analogWrite(left_blue_eye_pin, 240);
-  move(true, 30, head_pin, 90, head_pos, body_pin, 50, body_pos, right_arm_pin, 90, right_arm_pos, 0, 0, 0);
-}
-
-void point_left() {
-  move(false, 50, head_pin, head_pos, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-  move(false, 50, head_pin, 10, 170, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-  move(true, 10, head_pin, 170, 130, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-  delay(500);
-  move(true, 10, head_pin, 130, 90, body_pin, body_pos, 130, left_arm_pin, left_arm_pos, 70, 0, 0, 0);
-  analogWrite(right_blue_eye_pin, 255);
-  analogWrite(left_blue_eye_pin, 255);
-  for (int i = 0; i < 7; i++) {
-    analogWrite(right_red_eye_pin, 100);
-    analogWrite(left_red_eye_pin, 100);
-    delay(100);
-    analogWrite(right_red_eye_pin, 240);
-    analogWrite(left_red_eye_pin, 240);
-    delay(100);
-  }
-  analogWrite(right_red_eye_pin, 255);  
-  analogWrite(left_red_eye_pin, 255);         
-  analogWrite(right_blue_eye_pin, 240);
-  analogWrite(left_blue_eye_pin, 240);
-  move(true, 30, head_pin, 90, head_pos, body_pin, 130, body_pos, left_arm_pin, 70, left_arm_pos, 0, 0, 0);
-}
-
 void reset(int mode) {
+  // MODE:
+  // 0 = SET *_POS=RESET AND GOES TO RESET POSITION
+  // 1 = GOES TO RESET POSITION
+  // 2 = GOES TO *_POS
   motor1.attach(head_pin);
   motor2.attach(body_pin);
   motor3.attach(left_arm_pin);
@@ -414,13 +270,133 @@ void reset(int mode) {
   motor3.detach();
   motor4.detach();
 
+  if (mode == 0) {
+    happy_eyes(100, 3);
+  }
+}
+
+void happy_eyes(int time, int repeat) {
+  analogWrite(right_red_eye_pin, 255);
+  analogWrite(left_red_eye_pin, 255);
+  analogWrite(right_blue_eye_pin, 255);
+  analogWrite(left_blue_eye_pin, 255);
+  for (int i = 0; i < repeat; i++) {
+    analogWrite(right_blue_eye_pin, 100);
+    analogWrite(left_blue_eye_pin, 100);
+    delay(time);
+    analogWrite(right_blue_eye_pin, 255);
+    analogWrite(left_blue_eye_pin, 255);
+    if (i != repeat-1) {
+      delay(time);
+    }
+  }
+  analogWrite(right_blue_eye_pin, 240);
+  analogWrite(left_blue_eye_pin, 240);
+}
+
+void angry_eyes(int time, int repeat) {
+  analogWrite(right_red_eye_pin, 255);
+  analogWrite(left_red_eye_pin, 255);
+  analogWrite(right_blue_eye_pin, 255);
+  analogWrite(left_blue_eye_pin, 255);
+  for (int i = 0; i < repeat; i++) {
+    analogWrite(right_red_eye_pin, 100);
+    analogWrite(left_red_eye_pin, 100);
+    delay(time);
+    analogWrite(right_red_eye_pin, 255);
+    analogWrite(left_red_eye_pin, 255);
+    if (i != repeat-1) {
+      delay(time);
+    }
+  }
+  analogWrite(right_blue_eye_pin, 240);
+  analogWrite(left_blue_eye_pin, 240);
+}
+
+void scary_eyes(int time, int repeat) {
+  analogWrite(right_red_eye_pin, 255);
+  analogWrite(left_red_eye_pin, 255);
+  analogWrite(right_blue_eye_pin, 255);
+  analogWrite(left_blue_eye_pin, 255);
+  for (int i = 0; i < repeat; i++) {
+    analogWrite(right_blue_eye_pin, 100);
+    analogWrite(left_blue_eye_pin, 100);
+    analogWrite(right_red_eye_pin, 255);
+    analogWrite(left_red_eye_pin, 255);
+    delay(time);
+    analogWrite(right_blue_eye_pin, 255);
+    analogWrite(left_blue_eye_pin, 255);
+    analogWrite(right_red_eye_pin, 100);
+    analogWrite(left_red_eye_pin, 100);
+    if (i != repeat-1) {
+      delay(time);
+    }
+  }
+  analogWrite(right_blue_eye_pin, 240);
+  analogWrite(left_blue_eye_pin, 240);
+}
+
+void move_check() {
+  move(true, 30, head_pin, head_pos, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  move(true, 30, head_pin, 10, 170, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  move(true, 30, head_pin, 170, head_pos, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+  move(true, 30, body_pin, body_pos, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  move(true, 30, body_pin, 10, 170, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  move(true, 30, body_pin, 170, body_pos, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+  move(true, 30, right_arm_pin, right_arm_pos, 170, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  move(true, 30, right_arm_pin, 170, right_arm_pos, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+  move(true, 30, left_arm_pin, left_arm_pos, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  move(true, 30, left_arm_pin, 0, left_arm_pos, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+  analogWrite(right_red_eye_pin, 255);  
+  analogWrite(left_red_eye_pin, 255);         
+  analogWrite(right_blue_eye_pin, 255);
+  analogWrite(left_blue_eye_pin, 255);
+  delay(300);
+
+  analogWrite(right_red_eye_pin, 240);  
+  analogWrite(left_red_eye_pin, 240);         
+  delay(300);
+
   analogWrite(right_red_eye_pin, 255);  
   analogWrite(left_red_eye_pin, 255);         
   analogWrite(right_blue_eye_pin, 240);
   analogWrite(left_blue_eye_pin, 240);
 }
 
-void say_no() {
+//============================================================================//
+// FUNCTIONS (ADVANCED ACTIONS)                                               //
+//============================================================================//
+
+void move_say_hi() {
+  move(true, 10, right_arm_pin, right_arm_pos, 160, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  happy_eyes(300, 1);
+  delay(500);
+  move(true, 30, right_arm_pin, 160, right_arm_pos, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+}
+
+void move_say_bye() {
+  move(true, 10, right_arm_pin, right_arm_pos, 160, head_pin, head_pos, 60, 0, 0, 0, 0, 0, 0);
+  analogWrite(left_blue_eye_pin, 255);
+  move(true, 10, right_arm_pin, 160, 120, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  move(true, 10, right_arm_pin, 120, 160, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  move(true, 10, right_arm_pin, 160, 120, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  move(true, 10, right_arm_pin, 120, 160, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  analogWrite(left_blue_eye_pin, 240);
+  delay(500);
+  move(true, 30, right_arm_pin, 170, right_arm_pos, head_pin, 60, head_pos, 0, 0, 0, 0, 0, 0);
+}
+
+void move_say_yes() {
+  move(true, 10, right_arm_pin, right_arm_pos, 90, left_arm_pin, left_arm_pos, 70, 0, 0, 0, 0, 0, 0);
+  happy_eyes(100, 7);
+  move(true, 30, right_arm_pin, 90, right_arm_pos, left_arm_pin, 70, left_arm_pos, 0, 0, 0, 0, 0, 0);
+}
+
+void move_say_no() {
   analogWrite(right_blue_eye_pin, 255);
   analogWrite(left_blue_eye_pin, 255);
   analogWrite(right_red_eye_pin, 240);  
@@ -439,57 +415,93 @@ void say_no() {
   analogWrite(left_blue_eye_pin, 240);
 }
 
-void say_yes() {
-  move(true, 10, right_arm_pin, right_arm_pos, 90, left_arm_pin, left_arm_pos, 70, 0, 0, 0, 0, 0, 0);
-
-  for (int i = 0; i < 7; i++) {
-    shine_blue(100);
-    delay(100);
-  }
-
-  move(true, 30, right_arm_pin, 90, right_arm_pos, left_arm_pin, 70, left_arm_pos, 0, 0, 0, 0, 0, 0);
-}
-
-void shine_blue(int time) {
-  analogWrite(right_blue_eye_pin, 100);
-  analogWrite(left_blue_eye_pin, 100);
-  delay(time);
-  analogWrite(right_blue_eye_pin, 240);
-  analogWrite(left_blue_eye_pin, 240);
-}
-
-void stand_left_arm() {
-  move(true, 10, left_arm_pin, left_arm_pos, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-  shine_blue(300);
+void move_look_left() {
+  move(true, 10, head_pin, head_pos, 130, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  happy_eyes(300, 1);
   delay(500);
-  move(true, 30, left_arm_pin, 0, left_arm_pos, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  move(true, 30, head_pin, 130, head_pos, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 }
 
-void stand_right_arm() {
-  move(true, 10, right_arm_pin, right_arm_pos, 160, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-  shine_blue(300);
+void move_look_right() {
+  move(true, 10, head_pin, head_pos, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  happy_eyes(300, 1);
   delay(500);
-  move(true, 30, right_arm_pin, 160, right_arm_pos, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  move(true, 30, head_pin, 50, head_pos, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 }
 
-void turn_left() {
+void move_turn_left() {
   move(true, 10, body_pin, body_pos, 130, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-  shine_blue(300);
+  happy_eyes(300, 1);
   delay(500);
   move(true, 30, body_pin, 130, body_pos, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 }
 
-void turn_right() {
+void move_turn_right() {
   move(true, 10, body_pin, body_pos, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-  shine_blue(300);
+  happy_eyes(300, 1);
   delay(500);
   move(true, 30, body_pin, 50, body_pos, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 }
 
-void workout_arms() {
+void move_point_left() {
+  move(false, 50, head_pin, head_pos, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  move(false, 50, head_pin, 10, 170, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  move(true, 10, head_pin, 170, 130, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  delay(500);
+
+  move(true, 10, head_pin, 130, 90, body_pin, body_pos, 130, left_arm_pin, left_arm_pos, 70, 0, 0, 0);
+  analogWrite(right_blue_eye_pin, 255);
+  analogWrite(left_blue_eye_pin, 255);
+
+  for (int i = 0; i < 7; i++) {
+    analogWrite(right_red_eye_pin, 100);
+    analogWrite(left_red_eye_pin, 100);
+    delay(100);
+    analogWrite(right_red_eye_pin, 240);
+    analogWrite(left_red_eye_pin, 240);
+    delay(100);
+  }
+
+  analogWrite(right_red_eye_pin, 255);  
+  analogWrite(left_red_eye_pin, 255);         
+  analogWrite(right_blue_eye_pin, 240);
+  analogWrite(left_blue_eye_pin, 240);
+
+  move(true, 30, head_pin, 90, head_pos, body_pin, 130, body_pos, left_arm_pin, 70, left_arm_pos, 0, 0, 0);
+}
+
+void move_point_right() {
+  move(false, 50, head_pin, head_pos, 170, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  move(false, 50, head_pin, 170, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  move(true, 10, head_pin, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  delay(500);
+
+  move(true, 10, head_pin, 50, 90, body_pin, body_pos, 50, right_arm_pin, right_arm_pos, 90, 0, 0, 0);
+  analogWrite(right_blue_eye_pin, 255);
+  analogWrite(left_blue_eye_pin, 255);
+
+  for (int i = 0; i < 7; i++) {
+    analogWrite(right_red_eye_pin, 100);
+    analogWrite(left_red_eye_pin, 100);
+    delay(100);
+    analogWrite(right_red_eye_pin, 240);
+    analogWrite(left_red_eye_pin, 240);
+    delay(100);
+  }
+
+  analogWrite(right_red_eye_pin, 255);  
+  analogWrite(left_red_eye_pin, 255);         
+  analogWrite(right_blue_eye_pin, 240);
+  analogWrite(left_blue_eye_pin, 240);
+
+  move(true, 30, head_pin, 90, head_pos, body_pin, 50, body_pos, right_arm_pin, 90, right_arm_pos, 0, 0, 0);
+}
+
+void move_workout_arms() {
   move(true, 30, right_arm_pin, right_arm_pos, 160, 0, 0, 0, 0, 0, 0, 0, 0, 0);
   move(true, 30, left_arm_pin, left_arm_pos, 160, 0, 0, 0, 0, 0, 0, 0, 0, 0);
   delay(500);
+
   for (int i = 0; i < 3; i++) {
     analogWrite(right_red_eye_pin, 240);  
     analogWrite(left_red_eye_pin, 240);         
@@ -498,40 +510,24 @@ void workout_arms() {
     analogWrite(left_red_eye_pin, 255);         
     move(true, 20, right_arm_pin, 0, 160, left_arm_pin, 0, 160, 0, 0, 0, 0, 0, 0);
   }
+
   analogWrite(right_red_eye_pin, 240);  
   analogWrite(left_red_eye_pin, 240);         
   move(true, 20, right_arm_pin, 160, 0, left_arm_pin, 160, 0, 0, 0, 0, 0, 0, 0);
   analogWrite(right_red_eye_pin, 255);  
   analogWrite(left_red_eye_pin, 255);         
   delay(500);
+ 
   move(true, 30, right_arm_pin, 0, right_arm_pos, 0, 0, 0, 0, 0, 0, 0, 0, 0);
   move(true, 30, left_arm_pin, 0, left_arm_pos, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 }
 
-void workout_waist() {
-  move(true, 40, right_arm_pin, right_arm_pos, 90, left_arm_pin, left_arm_pos, 70, 0, 0, 0, 0, 0, 0);
-  delay(500);
-  move(true, 50, head_pin, head_pos, 30, body_pin, body_pos, 150, 0, 0, 0, 0, 0, 0);
-  delay(500);
-  for (int i = 0; i < 3; i++) {
-    analogWrite(right_red_eye_pin, 240);  
-    analogWrite(left_red_eye_pin, 240);         
-    move(true, 30, head_pin, 30, 150, body_pin, 150, 30, 0, 0, 0, 0, 0, 0);
-    analogWrite(right_red_eye_pin, 255);  
-    analogWrite(left_red_eye_pin, 255);         
-    move(true, 30, head_pin, 150, 30, body_pin, 30, 150, 0, 0, 0, 0, 0, 0);
-  }
-  delay(500);
-  move(true, 50, head_pin, 30, head_pos, body_pin, 150, head_pos, 0, 0, 0, 0, 0, 0);
-  delay(500);
-  move(true, 40, right_arm_pin, 90, right_arm_pos, left_arm_pin, 70, left_arm_pos, 0, 0, 0, 0, 0, 0);
-}
-
-void workout_neck() {
+void move_workout_neck() {
   move(true, 40, right_arm_pin, right_arm_pos, 160, left_arm_pin, left_arm_pos, 70, 0, 0, 0, 0, 0, 0);
   delay(500);
   move(true, 50, head_pin, head_pos, 30, 0, 0, 0, 0, 0, 0, 0, 0, 0);
   delay(500);
+
   for (int i = 0; i < 3; i++) {
     analogWrite(right_red_eye_pin, 240);  
     analogWrite(left_red_eye_pin, 240);         
@@ -540,6 +536,7 @@ void workout_neck() {
     analogWrite(left_red_eye_pin, 255);         
     move(true, 30, head_pin, 150, 30, right_arm_pin, 90, 160, left_arm_pin, 0, 70, 0, 0, 0);
   }
+
   delay(500);
   move(true, 50, head_pin, 30, head_pos, 0, 0, 0, 0, 0, 0, 0, 0, 0);
   delay(500);
@@ -547,101 +544,321 @@ void workout_neck() {
   move(true, 40, right_arm_pin, 90, right_arm_pos, left_arm_pin, 70, left_arm_pos, 0, 0, 0, 0, 0, 0);
 }
 
-void loop() {
+void move_workout_waist() {
+  move(true, 40, right_arm_pin, right_arm_pos, 90, left_arm_pin, left_arm_pos, 70, 0, 0, 0, 0, 0, 0);
+  delay(500);
+  move(true, 50, head_pin, head_pos, 30, body_pin, body_pos, 150, 0, 0, 0, 0, 0, 0);
+  delay(500);
+
+  for (int i = 0; i < 3; i++) {
+    analogWrite(right_red_eye_pin, 240);  
+    analogWrite(left_red_eye_pin, 240);         
+    move(true, 30, head_pin, 30, 150, body_pin, 150, 30, 0, 0, 0, 0, 0, 0);
+    analogWrite(right_red_eye_pin, 255);  
+    analogWrite(left_red_eye_pin, 255);         
+    move(true, 30, head_pin, 150, 30, body_pin, 30, 150, 0, 0, 0, 0, 0, 0);
+  }
+
+  delay(500);
+  move(true, 50, head_pin, 30, head_pos, body_pin, 150, head_pos, 0, 0, 0, 0, 0, 0);
+  delay(500);
+  move(true, 40, right_arm_pin, 90, right_arm_pos, left_arm_pin, 70, left_arm_pos, 0, 0, 0, 0, 0, 0);
+}
+
+void move_dance() {
+  int head1 = 90;
+  int head2;
+  int body1 = 90;
+  int body2;
+  int left_arm1 = 90;
+  int left_arm2;
+  int right_arm1 = 70;
+  int right_arm2;
+
+  move(true, 30, head_pin, head_pos, 90, body_pin, body_pos, 90, left_arm_pin, left_arm_pos, 70, right_arm_pin, right_arm_pos, 90);
+  delay(500);
+
+  for (int i = 0; i < 10; i++) {
+    body2 = step_aux * random(int(50 / step_aux + 1), int(80 / step_aux + 1));
+    head2 = 90 + 2 * (90 - body2);
+    right_arm2 = step_aux * random(int(30 / step_aux + 1), int(80 / step_aux + 1));
+    left_arm2 = right_arm2 - 10;
+
+    analogWrite(right_blue_eye_pin, 255);  
+    analogWrite(left_blue_eye_pin, 255);         
+
+    move(false, 30, head_pin, head1, head2, body_pin, body1, body2, left_arm_pin, left_arm1, left_arm2, right_arm_pin, right_arm1, right_arm2);
+
+    head1 = head2;
+    body1 = body2;
+    right_arm1 = right_arm2;
+    left_arm1 = left_arm2;
+ 
+    body2 = step_aux * random(int(100 / step_aux + 1), int(130 / step_aux + 1));
+    head2 = 90 + 2 * (90 - body2);
+    right_arm2 = step_aux * random(int(100 / step_aux + 1), int(150 / step_aux + 1));
+    left_arm2 = right_arm2 - 10;
+
+    analogWrite(right_blue_eye_pin, 240);  
+    analogWrite(left_blue_eye_pin, 240);         
+
+    move(false, 30, head_pin, head1, head2, body_pin, body1, body2, left_arm_pin, left_arm1, left_arm2, right_arm_pin, right_arm1, right_arm2);
+
+    head1 = head2;
+    body1 = body2;
+    right_arm1 = right_arm2;
+    left_arm1 = left_arm2;
+ }
+
+  analogWrite(right_blue_eye_pin, 240);  
+  analogWrite(left_blue_eye_pin, 240);         
+
+  move(true, 30, head_pin, head1, 90, body_pin, body1, 90, left_arm_pin, left_arm1, 70, right_arm_pin, right_arm1, 90);
+  delay(500);
+  move(true, 30, head_pin, 90, head_pos, body_pin, 90, body_pos, left_arm_pin, 70, left_arm_pos, right_arm_pin, 90, right_arm_pos);
+}
+
+void move_random_1() {
+  int head1 = 90;
+  int head2;
+  int body1 = 90;
+  int body2;
+  int left_arm1 = 160;
+  int left_arm2;
+  int right_arm1 = 0;
+  int right_arm2;
+  int time_to_move;
+  int time_to_stay;
+
+  move(true, 30, head_pin, head_pos, head1, body_pin, body_pos, body1, left_arm_pin, left_arm_pos, left_arm1, right_arm_pin, right_arm_pos, right_arm1);
+  delay(100);
+
+  for (int i = 0; i < 15; i++) {
+    head2 = step_aux * random(int(30 / step_aux + 1), int(150 / step_aux + 1));
+    body2 = step_aux * random(int(30 / step_aux + 1), int(150 / step_aux + 1));
+    left_arm2 = step_aux * random(0, int(160 / step_aux + 1));
+    right_arm2 = step_aux * random(0, int(170 / step_aux + 1));
+
+    time_to_move=random(10, 101);
+    time_to_stay=random(10, 501);
+
+    move(true, time_to_move, head_pin, head1, head2, body_pin, body1, body2, right_arm_pin, right_arm1, right_arm2, left_arm_pin, left_arm1, left_arm2);
+    delay(time_to_stay);
+
+    head1 = head2;
+    body1 = body2;
+    right_arm1 = right_arm2;
+    left_arm1 = left_arm2;
+  }
+
+  move(true, 30, head_pin, head2, 90, body_pin, body2, 90, left_arm_pin, left_arm2, 160, right_arm_pin, right_arm2, 0);
   delay(200);
+  move(true, 30, head_pin, 90, head_pos, body_pin, 90, body_pos, left_arm_pin, 160, left_arm_pos, right_arm_pin, 0, right_arm_pos);
+}
 
-  if (blink_num == time_to_blink) {
-    blink_eye();
-    time_to_blink = random(20, 51);
-    blink_num = 0;
-  } else {
-    blink_num++;
-  }
+void move_random_2() {
+  int head1 = 90;
+  int head2;
+  int body1 = 90;
+  int body2;
+  int left_arm1 = 160;
+  int left_arm2;
+  int right_arm1 = 0;
+  int right_arm2;
+  int time_to_move_1;
+  int time_to_move_2;
+  int time_to_stay;
 
-  if (auto_move) {
-    if (auto_move_num == time_to_auto_move) {
-      move_auto_2();
-      time_to_auto_move = random(0, 11);
-      auto_move_num = 0;
+  move(true, 30, head_pin, head_pos, head1, body_pin, body_pos, body1, left_arm_pin, left_arm_pos, left_arm1, right_arm_pin, right_arm_pos, right_arm1);
+  delay(100);
+
+  for (int i = 0; i < 15; i++) {
+    head2 = step_aux * random(int(20 / step_aux + 1), int(160 / step_aux + 1));
+    if (random(1,3) == 1) {
+      body2 = step_aux * random(int(20 / step_aux + 1), int(160 / step_aux + 1));
     } else {
-      auto_move_num++;
+      body2 = body1;
     }
+    if (random(1,4) == 1) {
+      left_arm2 = step_aux * random(0, int(160 / step_aux + 1));
+    } else {
+      left_arm2 = left_arm1;
+    }
+    if (random(1,4) == 1) {
+      right_arm2 = step_aux * random(0, int(160 / step_aux + 1));
+    } else {
+      right_arm2 = right_arm1;
+    }
+
+    time_to_move_1 = random(10, 101);
+    time_to_move_2 = random(10, 101);
+    time_to_stay = random(10, 501);
+
+    move(true, time_to_move_1, head_pin, head1, head2, body_pin, body1, body2, right_arm_pin, right_arm1, right_arm2, left_arm_pin, left_arm1, left_arm2);
+    delay(time_to_stay);
+    move(true, time_to_move_2, head_pin, head2, head1, body_pin, body2, body1, right_arm_pin, right_arm2, right_arm1, left_arm_pin, left_arm2, left_arm1);
   }
 
-  if (irrecv.decode(&results)) {
-    if (results.value != 0) {
-      remote_button = results.value;
-      if (remote_button >= 3136) {
-        remote_button = remote_button - 3136;
-      }
-      if (remote_button >= 1088) {
-        remote_button = remote_button - 1088;
-      }
-//      Serial.println(remote_button, DEC);
-      switch (remote_button) {
-        case 0:
-          point_right();
-          break;
-        case 1:
-          say_yes();
-          break;
-        case 2:
-          stand_right_arm();
-          break;
-        case 3:
-          stand_left_arm();
-          break;
-        case 4:
-          say_no();
-          break;
-        case 5:
-          look_right();
-          break;
-        case 6:
-          look_left();
-          break;
-        case 7:
-          bye();
-          break;
-        case 8:
-          turn_right();
-          break;
-        case 9:
-          turn_left();
-          break;
-        case 13:
-          point_left();
-          break;
-        case 15:
-          workout_arms();
-          break;
-        case 18:
-          workout_waist();
-          break;
-        case 38:
-          workout_neck();
-          break;
-        case 20:
-          check();
-          break;
-        case 34:
-          reset(0);
-          break;
-        case 36:
-          dance_2();
-          break;
-        case 57:
-          if (auto_move) {
-            auto_move = false;
-            reset(0);
-          } else {
-            auto_move = true;
-            auto_move_num = 0;
-            time_to_auto_move = 0;
-          }
-          break;
-      }
-    }
-    irrecv.resume();
+  delay(200);
+  move(true, 30, head_pin, head1, head_pos, body_pin, body1, body_pos, left_arm_pin, left_arm1, left_arm_pos, right_arm_pin, right_arm1, right_arm_pos);
+}
+
+void move_head(int direc) {
+  int head_pos_aux = head_pos + direc * step_aux_2;
+  if (head_pos_aux > 19 && head_pos_aux < 161) {
+//    motor1.write(head_pos_aux);
+    move(true, 10, head_pin, head_pos, head_pos_aux, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    head_pos = head_pos_aux;
   }
 }
+
+void move_body(int direc) {
+  int body_pos_aux = body_pos + direc * step_aux_2;
+  if (body_pos_aux > 19 && body_pos_aux < 161) {
+//    motor2.write(body_pos_aux);
+    move(true, 10, body_pin, body_pos, body_pos_aux, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    body_pos = body_pos_aux;
+  }
+}
+
+void move_left_arm(int direc) {
+  int left_arm_pos_aux = left_arm_pos + direc * step_aux_2;
+  if (left_arm_pos_aux > 0 && left_arm_pos_aux < 161) {
+//    motor3.write(left_arm_pos_aux);
+    move(true, 10, left_arm_pin, left_arm_pos, left_arm_pos_aux, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    left_arm_pos = left_arm_pos_aux;
+  }
+}
+
+void move_right_arm(int direc) {
+  int right_arm_pos_aux = right_arm_pos + direc * step_aux_2;
+  if (right_arm_pos_aux > 0 && right_arm_pos_aux < 151) {
+//    motor4.write(right_arm_pos_aux);
+    move(true, 10, right_arm_pin, right_arm_pos, right_arm_pos_aux, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    right_arm_pos = right_arm_pos_aux;
+  }
+}
+
+//============================================================================//
+// MAIN                                                                       //
+//============================================================================//
+
+void loop() {
+
+  check_blink();
+
+// IR
+// delay(200);
+//  if (irrecv.decode(&results)) {
+//    if (results.value != 0) {
+//      option = results.value;
+//      if (option >= 3136) {
+//        option = option - 3136;
+//      }
+//      if (option >= 1088) {
+//        option = option - 1088;
+//      }
+
+  option = 999;
+
+  if (Serial1.available() > 1) {
+    if (Serial1.read() == 147) {
+      option = Serial1.read();
+      #ifdef DEBUG
+        Serial.println(option);
+      #endif
+    }
+  }
+
+  switch (option) {
+    case 1:
+      reset(0);
+      break;
+    case 2:
+      happy_eyes(100, 7);
+      break;
+    case 3:
+      angry_eyes(100, 7);
+      break;
+    case 4:
+      scary_eyes(100, 7);
+      break;
+    case 5:
+      move_say_hi();
+      break;
+    case 6:
+      move_say_bye();
+      break;
+    case 7:
+      move_say_yes();
+      break;
+    case 8:
+      move_say_no();
+      break;
+    case 9:
+      move_look_left();
+      break;
+    case 10:
+      move_look_right();
+      break;
+    case 11:
+      move_turn_left();
+      break;
+    case 12:
+      move_turn_right();
+      break;
+    case 13:
+      move_point_left();
+      break;
+    case 14:
+      move_point_right();
+      break;
+    case 15:
+      move_workout_arms();
+      break;
+    case 16:
+      move_workout_neck();
+      break;
+    case 17:
+      move_workout_waist();
+      break;
+    case 18:
+      move_dance();
+      break;
+    case 19:
+      move_random_1();
+      break;
+    case 20:
+      move_random_2();
+      break;
+    case 51:
+      move_head(-1);
+      break;
+    case 52:
+      move_head(1);
+      break;
+    case 53:
+      move_body(-1);
+      break;
+    case 54:
+      move_body(1);
+      break;
+    case 55:
+      move_left_arm(-1);
+      break;
+    case 56:
+      move_left_arm(1);
+      break;
+    case 57:
+      move_right_arm(1);
+      break;
+    case 58:
+      move_right_arm(-1);
+      break;
+  }
+}
+
+// IR
+//    irrecv.resume();
+//  }
+//}
