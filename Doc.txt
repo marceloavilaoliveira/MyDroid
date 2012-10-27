@@ -114,6 +114,12 @@ Version 2.3.0 - 21-Jul-12
 
 - Some adjusts in "Auto" movements
 
+Version x.x.x - xx-xxx-xx
+-------------
+
+- Some "auto" mode improvements
+
+
 =====
 IDEAS
 =====

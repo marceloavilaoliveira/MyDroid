@@ -1,5 +1,5 @@
 //============================================================================//
-//                        Marcelo Ávila de Oliveira                           //
+//                        Marcelo Avila de Oliveira                           //
 //                                                                            //
 //          MyDroid.ino - Version 2.3.0 - Android Figure Automation           //
 //============================================================================//
@@ -229,18 +229,12 @@ void check_sleep(int mode) {
 void change_sleep() {
   if (sleep) {
     // WAKE
-    if (autom) {
-      move_say_hi();
-    }
     reset(2);
     set_eyes(255, 255, 240, 240);
     time_to_blink = millis() + random(3000, 7000);
     time_to_sleep = millis() + sleep_interval;
   } else {
     // SLEEP
-    if (autom) {
-      move_say_bye(1);
-    }
     reset(1);
     set_eyes(254, 254, 255, 255);
   }
@@ -944,34 +938,10 @@ void move_auto() {
   } else {
     switch (random(1, 2001)) {
       case 1:
-      case 2:
-      case 3:
-      case 4:
-      case 5:
-      case 6:
-      case 7:
-      case 8:
         move_look_around();
         break;
-      case 9:
-      case 10:
-      case 11:
-      case 12:
+      case 2:
         move_turn_around();
-        break;
-      case 13:
-      case 14:
-        move_look_left();
-        break;
-      case 15:
-      case 16:
-        move_look_right();
-        break;
-      case 17:
-        move_turn_left();
-        break;
-      case 18:
-        move_turn_right();
         break;
     }
   }
@@ -1197,3 +1167,4 @@ void loop() {
     }
   }
 }
+
