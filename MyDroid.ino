@@ -1,7 +1,7 @@
 //============================================================================//
 //                        Marcelo Ávila de Oliveira                           //
 //                                                                            //
-//          MyDroid.ino - Version 2.2.0 - Android Figure Automation           //
+//          MyDroid.ino - Version 2.3.0 - Android Figure Automation           //
 //============================================================================//
 
 //============================================================================//
@@ -29,17 +29,22 @@ Servo motor3;
 Servo motor4;
 
 // PINS
-int head_pin = 24;
-int body_pin = 26;
-int left_arm_pin = 28;
-int right_arm_pin = 30;
+int count_pin = 5;
 int right_blue_eye_pin = 9;
 int right_red_eye_pin = 10;
 int left_blue_eye_pin = 11;
 int left_red_eye_pin = 12;
+int head_pin = 24;
+int body_pin = 26;
+int left_arm_pin = 28;
+int right_arm_pin = 30;
 int prox_sensor_pin = A2;
 
-// POSITIONS
+// POSITIONS  MIN  MED  MAX
+// Head     :  20   90  160
+// Body     :  20   90  160
+// Left Arm : 160   70    0
+// Right Arm:   0   90  160
 int head_pos;
 int body_pos;
 int left_arm_pos;
@@ -51,7 +56,7 @@ int right_arm_res_pos = 0;
 
 // TIME
 unsigned long current_time = millis();
-unsigned long sleep_interval = 15000;
+unsigned long sleep_interval = 30000;
 unsigned long time_to_sleep;
 unsigned long time_to_blink;
 
@@ -62,6 +67,8 @@ boolean autom = false;
 // MISCELANEOUS
 int step_move_prog = 5;
 int step_move_free = 10;
+int count_state = 0;
+int count_state_prev = 0;
 float prox_sensor;
 int option;
 int parameter;
@@ -79,11 +86,17 @@ void setup() {
   // INITIATE RANDOM NUMBER GENERATOR
   randomSeed(analogRead(0));
 
-  // ATTACH MOTORS
+  // INITIALIZE PINS
+  pinMode(count_pin, INPUT);
+  pinMode(right_blue_eye_pin, OUTPUT);
+  pinMode(right_red_eye_pin, OUTPUT);
+  pinMode(left_blue_eye_pin, OUTPUT);
+  pinMode(left_red_eye_pin, OUTPUT);
   motor1.attach(head_pin);
   motor2.attach(body_pin);
   motor3.attach(left_arm_pin);
   motor4.attach(right_arm_pin);
+  pinMode(prox_sensor_pin, INPUT);
 
   // INITIATE BLUETOOTH COMMUNICATION
   setup_bluetooth();
@@ -94,8 +107,7 @@ void setup() {
   set_eyes(254, 254, 255, 255);
 }
 
-void setup_bluetooth()
-{
+void setup_bluetooth() {
   Serial1.begin(38400);                    // Set baud rate
   Serial1.print("\r\n+STWMOD=0\r\n");      // Set to work in slave mode
   Serial1.print("\r\n+STNA=Avila147\r\n"); // Set name
@@ -132,7 +144,7 @@ void set_eyes(int left_red, int right_red, int left_blue, int right_blue) {
 }
 
 void blink_eyes() {
-  set_eyes(255, 255, 200, 200);
+  set_eyes(255, 255, 100, 100);
   delay(50);
   set_eyes(255, 255, 255, 255);
   delay(300);
@@ -149,29 +161,8 @@ void check_blink() {
 
 void check_proximity() {
   read_prox_sensor();
-  if (sleep) {
-    if (prox_sensor > 100) {
-      // WAKE
-      time_to_blink = millis() + random(3000, 7000);
-      time_to_sleep = millis() + sleep_interval;
-      if (autom) {
-        move_say_hi();
-      }
-      change_sleep();
-    }
-  } else {
-    if (prox_sensor > 100) {
-      // RESET TIME TO SLEEP
-      time_to_sleep = millis() + sleep_interval;
-    } else {
-      if (millis() > time_to_sleep) {
-        // SLEEP
-        if (autom) {
-          move_say_bye(1);
-        }
-        change_sleep();
-      }
-    }
+  if (prox_sensor > 100) {
+    check_sleep(1);
   }
 }
 
@@ -190,25 +181,70 @@ void check_bluetooth() {
         Serial.println(parameter);
       #endif
 
-      if (sleep) {
-        change_sleep();
-      }
-      time_to_sleep = millis() + sleep_interval;
+      check_sleep(1);
+
+      // THIS IS TO AVOID TO BLINK JUST AFTER A BLUETOOTH COMMAND
       time_to_blink = millis() + random(3000, 7000);
+
       ok = true;
     }
   }
 }
 
-void change_sleep() {
-  sleep=!sleep;
-  if (sleep) {
-    // SLEEP
-    set_eyes(254, 254, 255, 255);
-  } else {
-    // WAKE
-    set_eyes(255, 255, 240, 240);
+void check_count() {
+  count_state = digitalRead(count_pin);
+
+  if (count_state != count_state_prev) {
+    count_state_prev = count_state;
+
+    if (count_state == HIGH) {
+      check_sleep(1);
+
+      // WRITE A COUNT SIGNAL TO BLUETOOTH
+      Serial1.print(1);
+    }
   }
+}
+
+void check_sleep(int mode) {
+  // MODE:
+  // 0 = CHECK IF IT'S TIME TO SLEEP
+  // 1 = AN EVENT TO WAKE OR STAY WAKED JUST HAPPEN
+  if (mode) {
+    if (sleep) {
+      // WAKE
+      change_sleep();
+    } else {
+      // RESET TIME TO SLEEP
+      time_to_sleep = millis() + sleep_interval;
+    }
+  } else {
+    if (!sleep && millis() > time_to_sleep) {
+      // SLEEP
+      change_sleep();
+    }
+  }
+}
+
+void change_sleep() {
+  if (sleep) {
+    // WAKE
+    if (autom) {
+      move_say_hi();
+    }
+    reset(2);
+    set_eyes(255, 255, 240, 240);
+    time_to_blink = millis() + random(3000, 7000);
+    time_to_sleep = millis() + sleep_interval;
+  } else {
+    // SLEEP
+    if (autom) {
+      move_say_bye(1);
+    }
+    reset(1);
+    set_eyes(254, 254, 255, 255);
+  }
+  sleep=!sleep;
 }
 
 void move(int time, int pos1, int new_pos1, int pos2, int new_pos2, int pos3, int new_pos3, int pos4, int new_pos4) {
@@ -303,14 +339,20 @@ void move(int time, int pos1, int new_pos1, int pos2, int new_pos2, int pos3, in
 
 void reset(int mode) {
   // MODE:
-  // 0 = SET *_POS=RESET AND GO TO RESET POSITION
+  // 0 = SET *_POS AND GO TO RESET POSITION
   // 1 = GO TO RESET POSITION
   // 2 = GO TO LAST POSITION
+  // 3 = SET *_POS AND GO TO RANDOM POSITION
   if (mode == 0) {
     head_pos=head_res_pos;
     body_pos=body_res_pos;
     left_arm_pos=left_arm_res_pos;
     right_arm_pos=right_arm_res_pos;
+  } else if (mode == 3) {
+    head_pos=random(20, 161);
+    body_pos=random(20, 161);
+    left_arm_pos=random(0, 161);
+    right_arm_pos=random(0, 161);
   }
 
   if (mode == 1) {
@@ -350,41 +392,25 @@ void angry_eyes(int time, int repeat) {
   for (int i = 0; i < repeat; i++) {
     set_eyes(100, 100, 255, 255);
     delay(time);
-    analogWrite(right_red_eye_pin, 255);
-    analogWrite(left_red_eye_pin, 255);
+    set_eyes(255, 255, 255, 255);
     if (i != repeat-1) {
       delay(time);
     }
   }
-  analogWrite(right_red_eye_pin, 255);
-  analogWrite(left_red_eye_pin, 255);
-  analogWrite(right_blue_eye_pin, 240);
-  analogWrite(left_blue_eye_pin, 240);
+  set_eyes(255, 255, 240, 240);
 }
 
 void scary_eyes(int time, int repeat) {
-  analogWrite(right_red_eye_pin, 255);
-  analogWrite(left_red_eye_pin, 255);
-  analogWrite(right_blue_eye_pin, 255);
-  analogWrite(left_blue_eye_pin, 255);
+  set_eyes(255, 255, 255, 255);
   for (int i = 0; i < repeat; i++) {
-    analogWrite(right_blue_eye_pin, 100);
-    analogWrite(left_blue_eye_pin, 255);
-    analogWrite(right_red_eye_pin, 255);
-    analogWrite(left_red_eye_pin, 100);
+    set_eyes(100, 255, 255, 100);
     delay(time);
-    analogWrite(right_blue_eye_pin, 255);
-    analogWrite(left_blue_eye_pin, 100);
-    analogWrite(right_red_eye_pin, 100);
-    analogWrite(left_red_eye_pin, 255);
+    set_eyes(255, 100, 100, 255);
     if (i != repeat-1) {
       delay(time);
     }
   }
-  analogWrite(right_red_eye_pin, 255);
-  analogWrite(left_red_eye_pin, 255);
-  analogWrite(right_blue_eye_pin, 240);
-  analogWrite(left_blue_eye_pin, 240);
+  set_eyes(255, 255, 240, 240);
 }
 
 void move_check() {
@@ -405,18 +431,11 @@ void move_check() {
   move(30, 999, 999, 999, 999, 999, 999, right_arm_res_pos, 160);
   move(30, 999, 999, 999, 999, 999, 999, 160, right_arm_res_pos);
   // EYES
-  analogWrite(right_red_eye_pin, 255);  
-  analogWrite(left_red_eye_pin, 255);         
-  analogWrite(right_blue_eye_pin, 255);
-  analogWrite(left_blue_eye_pin, 255);
+  set_eyes(255, 255, 255, 255);
   delay(300);
-  analogWrite(right_red_eye_pin, 240);  
-  analogWrite(left_red_eye_pin, 240);         
+  set_eyes(240, 240, 255, 255);
   delay(300);
-  analogWrite(right_red_eye_pin, 255);  
-  analogWrite(left_red_eye_pin, 255);         
-  analogWrite(right_blue_eye_pin, 240);
-  analogWrite(left_blue_eye_pin, 240);
+  set_eyes(255, 255, 240, 240);
 
   reset(2);
 }
@@ -428,9 +447,9 @@ void move_check() {
 void move_say_hi() {
   reset(1);
 
-  move(0, 999, 999, 999, 999, 999, 999, right_arm_res_pos, 150);
+  move(0, 999, 999, 999, 999, 999, 999, right_arm_res_pos, 160);
   happy_eyes(800, 1);
-  move(40, 999, 999, 999, 999, 999, 999, 150, right_arm_res_pos);
+  move(40, 999, 999, 999, 999, 999, 999, 160, right_arm_res_pos);
 
   reset(2);
 }
@@ -438,23 +457,21 @@ void move_say_hi() {
 void move_say_bye(boolean going_sleep) {
   reset(1);
 
-  move(10, head_res_pos, 60, 999, 999, 999, 999, right_arm_res_pos, 150);
+  move(10, head_res_pos, 60, 999, 999, 999, 999, right_arm_res_pos, 160);
   delay(100);
-  analogWrite(left_blue_eye_pin, 255);
-  move(10, 999, 999, 999, 999, 999, 999, 150, 110);
+  set_eyes(255, 255, 255, 240);
+  move(10, 999, 999, 999, 999, 999, 999, 160, 110);
   delay(100);
-  move(10, 999, 999, 999, 999, 999, 999, 110, 150);
+  move(10, 999, 999, 999, 999, 999, 999, 110, 160);
   delay(100);
-  move(10, 999, 999, 999, 999, 999, 999, 150, 110);
+  move(10, 999, 999, 999, 999, 999, 999, 160, 110);
   delay(100);
-  move(10, 999, 999, 999, 999, 999, 999, 110, 150);
-  analogWrite(left_blue_eye_pin, 240);
+  move(10, 999, 999, 999, 999, 999, 999, 110, 160);
+  set_eyes(255, 255, 240, 240);
   delay(800);
-  move(40, 60, head_res_pos, 999, 999, 999, 999, 150, right_arm_res_pos);
+  move(40, 60, head_res_pos, 999, 999, 999, 999, 160, right_arm_res_pos);
 
-  if (going_sleep) {
-    reset(1);
-  } else {
+  if (! going_sleep) {
     reset(2);
   }
 }
@@ -472,23 +489,17 @@ void move_say_yes() {
 void move_say_no() {
   reset(1);
 
-  analogWrite(right_blue_eye_pin, 255);
-  analogWrite(left_blue_eye_pin, 255);
-  analogWrite(right_red_eye_pin, 240);  
-  analogWrite(left_red_eye_pin, 240);         
+  set_eyes(240, 240, 255, 255);
 
   move(10, head_res_pos, 30, 999, 999, 999, 999, right_arm_res_pos, 60);
-  move(10, 30, 140, 999, 999, 999, 999, 60, 150);
+  move(10, 30, 140, 999, 999, 999, 999, 60, 160);
   move(20, 140, 40, 999, 999, 999, 999, 999, 999);
   move(20, 40, 130, 999, 999, 999, 999, 999, 999);
-  move(20, 130, 50, 999, 999, 999, 999, 150, 70);
-  move(20, 50, head_res_pos, 999, 999, 999, 999, 70, right_arm_res_pos);
+  move(20, 130, 50, 999, 999, 999, 999, 160, 80);
+  move(20, 50, head_res_pos, 999, 999, 999, 999, 80, right_arm_res_pos);
   delay(200);
 
-  analogWrite(right_red_eye_pin, 255);  
-  analogWrite(left_red_eye_pin, 255);         
-  analogWrite(right_blue_eye_pin, 240);
-  analogWrite(left_blue_eye_pin, 240);
+  set_eyes(255, 255, 240, 240);
 
   reset(2);
 }
@@ -499,17 +510,14 @@ void move_happy() {
   move(0, head_res_pos, 120, body_res_pos, 60, left_arm_res_pos, 50, right_arm_res_pos, 50);
 
   for (int i = 0; i < 5; i++) {
-    analogWrite(right_blue_eye_pin, 100);  
-    analogWrite(left_blue_eye_pin, 100);         
+    set_eyes(255, 255, 100, 100);
     move(20, 120, 60, 60, 120, 50, 110, 50, 110);
-    analogWrite(right_blue_eye_pin, 255);  
-    analogWrite(left_blue_eye_pin, 255);         
+    set_eyes(255, 255, 255, 255);
     move(20, 60, 120, 120, 60, 110, 50, 110, 50);
   }
   move(0, 120, head_res_pos, 60, body_res_pos, 50, left_arm_res_pos, 50, right_arm_res_pos);
 
-  analogWrite(right_blue_eye_pin, 240);
-  analogWrite(left_blue_eye_pin, 240);
+  set_eyes(255, 255, 240, 240);
 
   reset(2);
 }
@@ -517,22 +525,18 @@ void move_happy() {
 void move_angry() {
   reset(1);
 
-  move(0, head_res_pos, 110, body_res_pos, 70, left_arm_res_pos, 20, right_arm_res_pos, 150);
-  analogWrite(right_blue_eye_pin, 255);
-  analogWrite(left_blue_eye_pin, 255);
+  move(0, head_res_pos, 110, body_res_pos, 70, left_arm_res_pos, 20, right_arm_res_pos, 160);
+  set_eyes(255, 255, 255, 255);
 
   for (int i = 0; i < 5; i++) {
-    analogWrite(right_red_eye_pin, 100);  
-    analogWrite(left_red_eye_pin, 100);         
-    move(20, 110, 70, 70, 110, 20, 0, 150, 130);
-    analogWrite(right_red_eye_pin, 255);  
-    analogWrite(left_red_eye_pin, 255);         
-    move(20, 70, 110, 110, 70, 0, 20, 130, 150);
+    set_eyes(100, 100, 255, 255);
+    move(20, 110, 70, 70, 110, 20, 0, 160, 130);
+    set_eyes(255, 255, 255, 255);
+    move(20, 70, 110, 110, 70, 0, 20, 130, 160);
   }
-  move(0, 110, head_res_pos, 70, body_res_pos, 20, left_arm_res_pos, 150, right_arm_res_pos);
+  move(0, 110, head_res_pos, 70, body_res_pos, 20, left_arm_res_pos, 160, right_arm_res_pos);
 
-  analogWrite(right_blue_eye_pin, 240);
-  analogWrite(left_blue_eye_pin, 240);
+  set_eyes(255, 255, 240, 240);
 
   reset(2);
 }
@@ -540,25 +544,16 @@ void move_angry() {
 void move_scary() {
   reset(1);
 
-  move(0, head_res_pos, 70, body_res_pos, 40, left_arm_res_pos, 0, right_arm_res_pos, 150);
+  move(0, head_res_pos, 70, body_res_pos, 40, left_arm_res_pos, 0, right_arm_res_pos, 160);
   for (int i = 0; i < 4; i++) {
-    analogWrite(right_blue_eye_pin, 100);
-    analogWrite(left_blue_eye_pin, 255);
-    analogWrite(right_red_eye_pin, 255);
-    analogWrite(left_red_eye_pin, 100);
-    move(20, 70, 110, 40, 140, 0, 10, 150, 140);
-    analogWrite(right_blue_eye_pin, 255);
-    analogWrite(left_blue_eye_pin, 100);
-    analogWrite(right_red_eye_pin, 100);
-    analogWrite(left_red_eye_pin, 255);
-    move(20, 110, 70, 140, 40, 10, 0, 140, 150);
+    set_eyes(100, 255, 255, 100);
+    move(20, 70, 110, 40, 140, 0, 10, 160, 140);
+    set_eyes(255, 100, 100, 255);
+    move(20, 110, 70, 140, 40, 10, 0, 140, 160);
   }
-  move(0, 70, head_res_pos, 40, body_res_pos, 0, left_arm_res_pos, 150, right_arm_res_pos);
+  move(0, 70, head_res_pos, 40, body_res_pos, 0, left_arm_res_pos, 160, right_arm_res_pos);
 
-  analogWrite(right_red_eye_pin, 255);  
-  analogWrite(left_red_eye_pin, 255);         
-  analogWrite(right_blue_eye_pin, 240);
-  analogWrite(left_blue_eye_pin, 240);
+  set_eyes(255, 255, 240, 240);
 
   reset(2);
 }
@@ -567,8 +562,8 @@ void move_look_left() {
   reset(1);
 
   move(10, head_res_pos, 130, 999, 999, 999, 999, 999, 999);
-  happy_eyes(300, 1);
-  delay(500);
+  delay(100);
+  happy_eyes(700, 1);
   move(40, 130, 90, body_res_pos, 130, 999, 999, 999, 999);
   delay(800);
   move(40, 90, head_res_pos, 130, body_res_pos, 999, 999, 999, 999);
@@ -580,8 +575,8 @@ void move_look_right() {
   reset(1);
 
   move(10, head_res_pos, 30, 999, 999, 999, 999, 999, 999);
-  happy_eyes(300, 1);
-  delay(500);
+  delay(100);
+  happy_eyes(700, 1);
   move(40, 30, 90, body_res_pos, 30, 999, 999, 999, 999);
   delay(800);
   move(40, 90, head_res_pos, 30, body_res_pos, 999, 999, 999, 999);
@@ -605,8 +600,8 @@ void move_turn_left() {
   reset(1);
 
   move(10, 999, 999, body_res_pos, 150, 999, 999, 999, 999);
-  happy_eyes(300, 1);
-  delay(500);
+  delay(100);
+  happy_eyes(700, 1);
   move(40, head_res_pos, 150, 150, body_res_pos, 999, 999, 999, 999);
   delay(800);
   move(40, 150, head_res_pos, 90, body_res_pos, 999, 999, 999, 999);
@@ -618,8 +613,8 @@ void move_turn_right() {
   reset(1);
 
   move(10, 999, 999, body_res_pos, 30, 999, 999, 999, 999);
-  happy_eyes(300, 1);
-  delay(500);
+  delay(100);
+  happy_eyes(700, 1);
   move(40, head_res_pos, 30, 30, body_res_pos, 999, 999, 999, 999);
   delay(800);
   move(40, 30, head_res_pos, 90, body_res_pos, 999, 999, 999, 999);
@@ -674,19 +669,15 @@ void move_workout_arms() {
   delay(500);
 
   for (int i = 0; i < 3; i++) {
-    analogWrite(right_red_eye_pin, 240);  
-    analogWrite(left_red_eye_pin, 240);         
+    set_eyes(240, 240, 240, 240);
     move(20, 999, 999, 999, 999, 160, 0, 160, 0);
-    analogWrite(right_red_eye_pin, 255);  
-    analogWrite(left_red_eye_pin, 255);         
+    set_eyes(255, 255, 240, 240);
     move(20, 999, 999, 999, 999, 0, 160, 0, 160);
   }
 
-  analogWrite(right_red_eye_pin, 240);  
-  analogWrite(left_red_eye_pin, 240);         
+  set_eyes(240, 240, 240, 240);
   move(20, 999, 999, 999, 999, 160, 0, 160, 0);
-  analogWrite(right_red_eye_pin, 255);  
-  analogWrite(left_red_eye_pin, 255);         
+  set_eyes(255, 255, 240, 240);
   delay(500);
   move(40, 999, 999, 999, 999, 0, left_arm_res_pos, 999, 999);
 
@@ -696,24 +687,22 @@ void move_workout_arms() {
 void move_workout_neck() {
   reset(1);
 
-  move(40, 999, 999, 999, 999, left_arm_res_pos, 70, right_arm_res_pos, 150);
+  move(40, 999, 999, 999, 999, left_arm_res_pos, 70, right_arm_res_pos, 160);
   delay(500);
   move(50,  head_res_pos, 30, 999, 999, 999, 999, 999, 999);
   delay(500);
 
   for (int i = 0; i < 3; i++) {
-    analogWrite(right_red_eye_pin, 240);  
-    analogWrite(left_red_eye_pin, 240);         
-    move(30, 30, 150, 999, 999, 70, 0, 150, 90);
-    analogWrite(right_red_eye_pin, 255);  
-    analogWrite(left_red_eye_pin, 255);         
-    move(30, 150, 30, 999, 999, 0, 70, 90, 150);
+    set_eyes(240, 240, 240, 240);
+    move(30, 30, 150, 999, 999, 70, 0, 160, 90);
+    set_eyes(255, 255, 240, 240);
+    move(30, 150, 30, 999, 999, 0, 70, 90, 160);
   }
 
   delay(500);
   move(50, 30, head_res_pos, 999, 999, 999, 999, 999, 999);
   delay(500);
-  move(40, 999, 999, 999, 999, 999, 999, 150, 90);
+  move(40, 999, 999, 999, 999, 999, 999, 160, 90);
   move(40, 999, 999, 999, 999, 70, left_arm_res_pos, 90, right_arm_res_pos);
 
   reset(2);
@@ -728,11 +717,9 @@ void move_workout_waist() {
   delay(500);
 
   for (int i = 0; i < 3; i++) {
-    analogWrite(right_red_eye_pin, 240);  
-    analogWrite(left_red_eye_pin, 240);         
+    set_eyes(240, 240, 240, 240);
     move(30, 30, 150, 150, 30, 999, 999, 999, 999);
-    analogWrite(right_red_eye_pin, 255);  
-    analogWrite(left_red_eye_pin, 255);         
+    set_eyes(255, 255, 240, 240);
     move(30, 150, 30, 30, 150, 999, 999, 999, 999);
   }
 
@@ -743,6 +730,8 @@ void move_workout_waist() {
 
   reset(2);
 }
+
+// set_eyes(xxxxx);
 
 void move_dance() {
   int head1 = head_res_pos;
@@ -775,7 +764,7 @@ void move_dance() {
  
     body2 = step_move_prog * random(int(100 / step_move_prog + 1), int(130 / step_move_prog + 1));
     head2 = 90 + 2 * (90 - body2);
-    right_arm2 = step_move_prog * random(int(100 / step_move_prog + 1), int(150 / step_move_prog + 1));
+    right_arm2 = step_move_prog * random(int(100 / step_move_prog + 1), int(160 / step_move_prog + 1));
     left_arm2 = right_arm2 - 10;
     analogWrite(right_blue_eye_pin, 240);
     analogWrite(left_blue_eye_pin, 240);
@@ -815,7 +804,7 @@ void move_random_1() {
     head2 = step_move_prog * random(int(30 / step_move_prog + 1), int(150 / step_move_prog + 1));
     body2 = step_move_prog * random(int(30 / step_move_prog + 1), int(150 / step_move_prog + 1));
     left_arm2 = step_move_prog * random(0, int(160 / step_move_prog + 1));
-    right_arm2 = step_move_prog * random(0, int(150 / step_move_prog + 1));
+    right_arm2 = step_move_prog * random(0, int(160 / step_move_prog + 1));
     time_to_move=random(10, 101);
     time_to_stay=random(10, 501);
 
@@ -904,7 +893,7 @@ void move_left_arm(int direc) {
 
 void move_right_arm(int direc) {
   int right_arm_pos_aux = right_arm_pos + direc * step_move_free;
-  if (right_arm_pos_aux > -1 && right_arm_pos_aux < 151) {
+  if (right_arm_pos_aux > -1 && right_arm_pos_aux < 161) {
     move(10, 999, 999, 999, 999, 999, 999, right_arm_pos, right_arm_pos_aux);
     right_arm_pos = right_arm_pos_aux;
   }
@@ -918,7 +907,7 @@ void move_auto() {
   int time_prox;
 
   read_prox_sensor();
-  if (prox_sensor > 500) {
+  if (prox_sensor > 400) {
     move_angry();
   } else if (prox_sensor > 100) {
     head2 = step_move_prog * random(int(20 / step_move_prog + 1), int(160 / step_move_prog + 1));
@@ -939,41 +928,51 @@ void move_auto() {
     }
 
     read_prox_sensor();
-    time_prox = 70 - prox_sensor / 8;
+    time_prox = 60 - prox_sensor / 7;
     if (time_prox < 0) { time_prox = 0; };
     move(time_prox, head_pos, head2, body_pos, body2, left_arm_pos, left_arm2, right_arm_pos, right_arm2);
 
     read_prox_sensor();
-    time_prox = 600 - prox_sensor;
+    time_prox = 500 - prox_sensor;
     if (time_prox < 100) { time_prox = 100; };
     delay(time_prox);
 
     read_prox_sensor();
-    time_prox = 70 - prox_sensor / 8;
+    time_prox = 60 - prox_sensor / 7;
     if (time_prox < 0) { time_prox = 0; };
     move(time_prox, head2, head_pos, body2, body_pos, left_arm2, left_arm_pos, right_arm2, right_arm_pos);
   } else {
-    switch (random(1, 21)) {
+    switch (random(1, 2001)) {
       case 1:
+      case 2:
+      case 3:
+      case 4:
+      case 5:
+      case 6:
+      case 7:
+      case 8:
         move_look_around();
         break;
-      case 2:
+      case 9:
+      case 10:
+      case 11:
+      case 12:
         move_turn_around();
         break;
-      case 3:
+      case 13:
+      case 14:
         move_look_left();
         break;
-      case 4:
+      case 15:
+      case 16:
         move_look_right();
         break;
-      case 5:
+      case 17:
         move_turn_left();
         break;
-      case 6:
+      case 18:
         move_turn_right();
         break;
-      default:
-        delay(500);
     }
   }
 }
@@ -1031,148 +1030,167 @@ void move_simon(int mode, int time) {
   }
 }
 
+void move_count(int number) {
+  int head_pos = map(number/100, 0, 3, 90, 20);
+  int right_arm_pos =  map(number%100/10, 0, 9, 0, 160);
+  int left_arm_pos = map(number%10, 0, 9, 160, 0);
+  
+  set_eyes(100, 100, 255, 255);
+
+  motor1.write(head_pos);
+  motor2.write(90);
+  motor3.write(left_arm_pos);
+  motor4.write(right_arm_pos);
+  delay(100);
+
+  set_eyes(255, 255, 240, 240);
+}
+
+void execute_option() {
+  switch (option) {
+    case 1:
+      autom=!autom;
+      break;
+    case 2:
+      move_happy();
+      break;
+    case 3:
+      move_angry();
+      break;
+    case 4:
+      move_scary();
+      break;
+    case 5:
+      move_say_hi();
+      break;
+    case 6:
+      move_say_bye(0);
+      break;
+    case 7:
+      move_say_yes();
+      break;
+    case 8:
+      move_say_no();
+      break;
+    case 9:
+      move_look_left();
+      break;
+    case 10:
+      move_look_right();
+      break;
+    case 11:
+      move_turn_left();
+      break;
+    case 12:
+      move_turn_right();
+      break;
+    case 13:
+      move_point_left();
+      break;
+    case 14:
+      move_point_right();
+      break;
+    case 15:
+      move_workout_arms();
+      break;
+    case 16:
+      move_workout_neck();
+      break;
+    case 17:
+      move_workout_waist();
+      break;
+    case 18:
+      move_dance();
+      break;
+    case 19:
+      move_random_1();
+      break;
+    case 20:
+      move_random_2();
+      break;
+    case 21:
+      move_check();
+      break;
+    case 51:
+      move_head(-1);
+      break;
+    case 52:
+      move_head(1);
+      break;
+    case 53:
+      move_body(-1);
+      break;
+    case 54:
+      move_body(1);
+      break;
+    case 55:
+      move_left_arm(-1);
+      break;
+    case 56:
+      move_left_arm(1);
+      break;
+    case 57:
+      move_right_arm(1);
+      break;
+    case 58:
+      move_right_arm(-1);
+      break;
+    case 61:
+      move_simon(1, parameter);
+      break;
+    case 62:
+      move_simon(2, parameter);
+      break;
+    case 63:
+      move_simon(3, parameter);
+      break;
+    case 64:
+      move_simon(4, parameter);
+      break;
+    case 65:
+      move_simon(5, parameter);
+      break;
+    case 66:
+      move_simon(6, parameter);
+      break;
+    case 67:
+      move_simon(7, parameter);
+      break;
+    case 68:
+      move_simon(8, parameter);
+      break;
+    case 69:
+      move_simon(9, 0);
+      break;
+    case 71:
+      happy_eyes(300, parameter);
+      break;
+    case 72:
+      angry_eyes(300, parameter);
+      break;
+    case 75:
+      move_count(parameter);
+      break;
+    case 100:
+      reset(parameter);
+      break;
+  }
+}
+
 //============================================================================//
 // MAIN                                                                       //
 //============================================================================//
 
 void loop() {
   check_proximity();
+  check_count();
   check_bluetooth();
+  check_sleep(0);
 
   if (! sleep) {
     check_blink();
 
-    switch (option) {
-      case 1:
-        autom=!autom;
-        break;
-      case 2:
-        move_happy();
-        break;
-      case 3:
-        move_angry();
-        break;
-      case 4:
-        move_scary();
-        break;
-      case 5:
-        move_say_hi();
-        break;
-      case 6:
-        move_say_bye(0);
-        break;
-      case 7:
-        move_say_yes();
-        break;
-      case 8:
-        move_say_no();
-        break;
-      case 9:
-        move_look_left();
-        break;
-      case 10:
-        move_look_right();
-        break;
-      case 11:
-        move_turn_left();
-        break;
-      case 12:
-        move_turn_right();
-        break;
-      case 13:
-        move_point_left();
-        break;
-      case 14:
-        move_point_right();
-        break;
-      case 15:
-        move_workout_arms();
-        break;
-      case 16:
-        move_workout_neck();
-        break;
-      case 17:
-        move_workout_waist();
-        break;
-      case 18:
-        move_dance();
-        break;
-      case 19:
-        move_random_1();
-        break;
-      case 20:
-        move_random_2();
-        break;
-      case 21:
-        move_check();
-        break;
-      case 51:
-        move_head(-1);
-        break;
-      case 52:
-        move_head(1);
-        break;
-      case 53:
-        move_body(-1);
-        break;
-      case 54:
-        move_body(1);
-        break;
-      case 55:
-        move_left_arm(-1);
-        break;
-      case 56:
-        move_left_arm(1);
-        break;
-      case 57:
-        move_right_arm(1);
-        break;
-      case 58:
-        move_right_arm(-1);
-        break;
-      case 61:
-        move_simon(1, parameter);
-        break;
-      case 62:
-        move_simon(2, parameter);
-        break;
-      case 63:
-        move_simon(3, parameter);
-        break;
-      case 64:
-        move_simon(4, parameter);
-        break;
-      case 65:
-        move_simon(5, parameter);
-        break;
-      case 66:
-        move_simon(6, parameter);
-        break;
-      case 67:
-        move_simon(7, parameter);
-        break;
-      case 68:
-        move_simon(8, parameter);
-        break;
-      case 69:
-        move_simon(9, 0);
-        break;
-      case 71:
-        happy_eyes(300, parameter);
-        break;
-      case 72:
-        angry_eyes(300, parameter);
-        break;
-      case 100:
-        reset(0);
-        break;
-      case 101:
-        reset(1);
-        break;
-      case 102:
-        reset(2);
-        break;
-    }
+    execute_option();
 
     if (autom) {
       move_auto();

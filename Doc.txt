@@ -113,3 +113,30 @@ Version 2.3.0 - 21-Jul-12
 - Added commands to wake the droid as soon as any android menu was accessed
 
 - Some adjusts in "Auto" movements
+
+=====
+IDEAS
+=====
+
+- 4-bit maze
+- My_Clock => My_Droid
+- Sound / Syntesis
+
+=====
+DO TO
+=====
+
+Arduino
+-------
+
+
+
+Android
+-------
+
+
+
+Arduino / Android
+-----------------
+
+- Remover o token 147? Remover "while !ok"?
