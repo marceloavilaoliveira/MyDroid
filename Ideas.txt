@@ -1,0 +1,36 @@
+=====
+IDEAS
+=====
+
+- Simon game
+
+  - 4 options (head/body/left arm/right arm)
+  - 8 options (head/body/left arm/right arm x left-right/up-down)
+
+- 4-bit maze
+
+DO TO
+=====
+
+Arduino
+-------
+
+- acabar de trocar ocorrencias de analogWrite() por set_eyes()
+
+
+Android
+-------
+
+
+
+Arduino / Android
+-----------------
+
+- Remover o token 147? Remover "while !ok"?
+
+
+NEXT
+====
+
+My_Clock => My_Droid
+Sound / Syntesis

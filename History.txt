@@ -1,0 +1,115 @@
+=======
+HISTORY
+=======
+
+
+Version 1.0.0 - 14-Mar-12
+-------------
+
+- Controled by Infrared Remote
+
+- When turned On:
+
+  Blink eyes
+  Wait for commands
+
+- Commands available:
+
+  Blink eyes
+  Reset
+  Move Bye
+  Move Check
+  Move Dance1
+  Move Dance2
+  Move Look left
+  Move Look right
+  Move Point left
+  Move Point right
+  Move Random1
+  Move Random2
+  Move Say no
+  Move Say yes
+  Move Stand left arm
+  Move Stand right arm
+  Move Turn left
+  Move Turn right
+  Move Workout arms
+  Move Workout neck
+  Move Workout waist
+
+Version 2.0.0 - 25-Apr-12
+-------------
+
+- Created control by Bluetooth
+
+- Created Android App:
+
+  "Prog Moves" function
+  "Free Moves" function
+
+- Commands changed and improved:
+
+  Blink eyes
+  Reset
+  Move Happy
+  Move Angry
+  Move Scary
+  Move Say Hi
+  Move Say Bye
+  Move Say Yes
+  Move Say No
+  Move Look left
+  Move Look right
+  Move Turn left
+  Move Turn right
+  Move Point left
+  Move Point right
+  Move Workout arms
+  Move Workout neck
+  Move Workout waist
+  Move Dance
+  Move Random1
+  Move Random2
+  Move Check
+  Free Moves
+
+- Removed control by Infrared Remote
+
+Version 2.1.0 - 31-May-12
+-------------
+
+- Created proximity sensor
+
+- Created Sleep feature
+
+- Created "Move Auto" feature
+
+- Created "Move Look around" command
+
+Version 2.2.0 - 30-Jun-12
+-------------
+
+- Created "Simon" feature
+
+- Added the possibility to pass two values (instead of one) by bluetooth
+
+- Created "reset(1)" (go to reset position) and "reset(2)" (to to last position) functions
+
+- Created "happy_eyes" and "angry_eyes" functions
+
+- Fixed bug in bluetooth communication (add "noise" because of read to fast)
+
+Version 2.3.0 - 21-Jul-12
+-------------
+
+- Created "Counter" feature
+
+- Created "move_random()" function and added a "Rand." button to the "Free Moves" feature
+
+- Added the reset(1) and reset(2) functions when sleeping and waking (respectively)
+
+- Rewrote the reset, sleep/wake(check_sleep), check_proximity, check_count, check_bluetooth functions
+
+- Added commands to wake the droid as soon as any android menu was accessed
+
+- Some adjusts in "Auto" movements
