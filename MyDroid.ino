@@ -9,7 +9,7 @@
 //============================================================================//
 
 // TURN ON DEBUG MODE
-// #define DEBUG
+//#define DEBUG
 
 //============================================================================//
 // LIBRARIES                                                                  //
@@ -40,19 +40,31 @@ int left_arm_pin = 28;
 int right_arm_pin = 30;
 int prox_sensor_pin = A2;
 
-// POSITIONS  MIN  MED  MAX
-// Head     :  20   90  160
-// Body     :  20   90  160
-// Left Arm : 160   70    0
-// Right Arm:   0   90  160
+// POSITIONS
+// HEAD
+int head_min = 20;
+int head_avg = 90;
+int head_max = 160;
+int head_res_pos = head_avg;
 int head_pos;
+// BODY
+int body_min = 20;
+int body_avg = 90;
+int body_max = 160;
+int body_res_pos = body_avg;
 int body_pos;
+// LEFT ARM
+int left_arm_min = 160;
+int left_arm_avg = 70;
+int left_arm_max = 0;
+int left_arm_res_pos = left_arm_min;
 int left_arm_pos;
+// RIGHT ARM
+int right_arm_min = 0;
+int right_arm_avg = 90;
+int right_arm_max = 150;
+int right_arm_res_pos = right_arm_min;
 int right_arm_pos;
-int head_res_pos = 90;
-int body_res_pos = 90;
-int left_arm_res_pos = 160;
-int right_arm_res_pos = 0;
 
 // TIME
 unsigned long current_time = millis();
@@ -70,22 +82,12 @@ int step_move_free = 10;
 int count_state = 0;
 int count_state_prev = 0;
 float prox_sensor;
-int option;
-int parameter;
 
 //============================================================================//
 // FUNCTIONS (SETUP)                                                          //
 //============================================================================//
 
 void setup() {
-  #ifdef DEBUG
-    // INITIATE SERIAL COMMUNICATION
-    Serial.begin(9600);
-  #endif
-
-  // INITIATE RANDOM NUMBER GENERATOR
-  randomSeed(analogRead(0));
-
   // INITIALIZE PINS
   pinMode(count_pin, INPUT);
   pinMode(right_blue_eye_pin, OUTPUT);
@@ -98,8 +100,14 @@ void setup() {
   motor4.attach(right_arm_pin);
   pinMode(prox_sensor_pin, INPUT);
 
+  // INITIATE SERIAL COMMUNICATION
+  Serial.begin(9600);
+
   // INITIATE BLUETOOTH COMMUNICATION
   setup_bluetooth();
+
+  // INITIATE RANDOM NUMBER GENERATOR
+  randomSeed(analogRead(0));
 
   // RESET ROBOT
   reset(0);
@@ -166,31 +174,6 @@ void check_proximity() {
   }
 }
 
-void check_bluetooth() {
-  option = 999;
-  boolean ok = false;
-  while (Serial1.available() && !ok) {
-    if (Serial1.read() == 147) {
-      delay(50);
-      option = Serial1.read();
-      delay(50);
-      parameter = Serial1.read();
-
-      #ifdef DEBUG
-        Serial.println(option);
-        Serial.println(parameter);
-      #endif
-
-      check_sleep(1);
-
-      // THIS IS TO AVOID TO BLINK JUST AFTER A BLUETOOTH COMMAND
-      time_to_blink = millis() + random(3000, 7000);
-
-      ok = true;
-    }
-  }
-}
-
 void check_count() {
   count_state = digitalRead(count_pin);
 
@@ -202,6 +185,64 @@ void check_count() {
 
       // WRITE A COUNT SIGNAL TO BLUETOOTH
       Serial1.print(1);
+    }
+  }
+}
+
+void check_serial() {
+  boolean ok = false;
+  char read_aux1;
+  char read_aux2[20];
+  int char_num = 0;
+  int option = 999;
+  while (Serial.available() && !ok) {
+    read_aux1 = Serial.read();
+    delay(50);
+
+    if (read_aux1 == '|') {
+      option = atoi(read_aux2);
+      ok = true;
+    } else {
+      read_aux2[char_num] = read_aux1;
+      char_num++;
+    }
+  }
+
+  ok = false;
+  char_num = 0;
+  int parameter = 0;
+  char read_aux3[20];
+  while (Serial.available() && !ok) {
+    read_aux1 = Serial.read();
+    delay(50);
+
+    if (read_aux1 == '|') {
+      parameter = atoi(read_aux3);
+      ok = true;
+    } else {
+      read_aux3[char_num] = read_aux1;
+      char_num++;
+    }
+  }
+  
+  if (option != 999) {
+    execute_option(option, parameter);
+  }
+}
+
+void check_bluetooth() {
+  int option = 999;
+  int parameter = 0;
+  boolean ok = false;
+  while (Serial1.available() && !ok) {
+    if (Serial1.read() == 147) {
+      delay(50);
+      option = Serial1.read();
+      delay(50);
+      parameter = Serial1.read();
+
+      ok = true;
+      execute_option(option, parameter);
     }
   }
 }
@@ -343,10 +384,10 @@ void reset(int mode) {
     left_arm_pos=left_arm_res_pos;
     right_arm_pos=right_arm_res_pos;
   } else if (mode == 3) {
-    head_pos=random(20, 161);
-    body_pos=random(20, 161);
-    left_arm_pos=random(0, 161);
-    right_arm_pos=random(0, 161);
+    head_pos=random(head_min, head_max+1);
+    body_pos=random(body_min, body_max+1);
+    left_arm_pos=random(left_arm_max, left_arm_min+1);
+    right_arm_pos=random(right_arm_min, right_arm_max+1);
   }
 
   if (mode == 1) {
@@ -411,19 +452,19 @@ void move_check() {
   reset(1);
 
   // HEAD
-  move(30, head_res_pos, 20, 999, 999, 999, 999, 999, 999);
-  move(30, 20, 160, 999, 999, 999, 999, 999, 999);
-  move(30, 160, head_res_pos, 999, 999, 999, 999, 999, 999);
+  move(30, head_res_pos, head_min, 999, 999, 999, 999, 999, 999);
+  move(30, head_min, head_max, 999, 999, 999, 999, 999, 999);
+  move(30, head_max, head_res_pos, 999, 999, 999, 999, 999, 999);
   // BODY
-  move(30, 999, 999, body_res_pos, 20, 999, 999, 999, 999);
-  move(30, 999, 999, 20, 160, 999, 999, 999, 999);
-  move(30, 999, 999, 160, body_res_pos, 999, 999, 999, 999);
+  move(30, 999, 999, body_res_pos, body_min, 999, 999, 999, 999);
+  move(30, 999, 999, body_min, body_max, 999, 999, 999, 999);
+  move(30, 999, 999, body_max, body_res_pos, 999, 999, 999, 999);
   // LEFT ARM
-  move(30, 999, 999, 999, 999, left_arm_res_pos, 0, 999, 999);
-  move(30, 999, 999, 999, 999, 0, left_arm_res_pos, 999, 999);
+  move(30, 999, 999, 999, 999, left_arm_res_pos, left_arm_max, 999, 999);
+  move(30, 999, 999, 999, 999, left_arm_max, left_arm_res_pos, 999, 999);
   // RIGHT ARM
-  move(30, 999, 999, 999, 999, 999, 999, right_arm_res_pos, 160);
-  move(30, 999, 999, 999, 999, 999, 999, 160, right_arm_res_pos);
+  move(30, 999, 999, 999, 999, 999, 999, right_arm_res_pos, right_arm_max);
+  move(30, 999, 999, 999, 999, 999, 999, right_arm_max, right_arm_res_pos);
   // EYES
   set_eyes(255, 255, 255, 255);
   delay(300);
@@ -441,9 +482,9 @@ void move_check() {
 void move_say_hi() {
   reset(1);
 
-  move(0, 999, 999, 999, 999, 999, 999, right_arm_res_pos, 160);
+  move(0, 999, 999, 999, 999, 999, 999, right_arm_res_pos, right_arm_max);
   happy_eyes(800, 1);
-  move(40, 999, 999, 999, 999, 999, 999, 160, right_arm_res_pos);
+  move(40, 999, 999, 999, 999, 999, 999, right_arm_max, right_arm_res_pos);
 
   reset(2);
 }
@@ -451,19 +492,19 @@ void move_say_hi() {
 void move_say_bye(boolean going_sleep) {
   reset(1);
 
-  move(10, head_res_pos, 60, 999, 999, 999, 999, right_arm_res_pos, 160);
+  move(10, head_res_pos, 60, 999, 999, 999, 999, right_arm_res_pos, right_arm_max);
   delay(100);
   set_eyes(255, 255, 255, 240);
-  move(10, 999, 999, 999, 999, 999, 999, 160, 110);
+  move(10, 999, 999, 999, 999, 999, 999, right_arm_max, 110);
   delay(100);
-  move(10, 999, 999, 999, 999, 999, 999, 110, 160);
+  move(10, 999, 999, 999, 999, 999, 999, 110, right_arm_max);
   delay(100);
-  move(10, 999, 999, 999, 999, 999, 999, 160, 110);
+  move(10, 999, 999, 999, 999, 999, 999, right_arm_max, 110);
   delay(100);
-  move(10, 999, 999, 999, 999, 999, 999, 110, 160);
+  move(10, 999, 999, 999, 999, 999, 999, 110, right_arm_max);
   set_eyes(255, 255, 240, 240);
   delay(800);
-  move(40, 60, head_res_pos, 999, 999, 999, 999, 160, right_arm_res_pos);
+  move(40, 60, head_res_pos, 999, 999, 999, 999, right_arm_max, right_arm_res_pos);
 
   if (! going_sleep) {
     reset(2);
@@ -473,9 +514,9 @@ void move_say_bye(boolean going_sleep) {
 void move_say_yes() {
   reset(1);
 
-  move(10, 999, 999, 999, 999, left_arm_res_pos, 70, right_arm_res_pos, 90);
+  move(10, 999, 999, 999, 999, left_arm_res_pos, left_arm_avg, right_arm_res_pos, right_arm_avg);
   happy_eyes(100, 7);
-  move(40, 999, 999, 999, 999, 70, left_arm_res_pos, 90, right_arm_res_pos);
+  move(40, 999, 999, 999, 999, left_arm_avg, left_arm_res_pos, right_arm_avg, right_arm_res_pos);
 
   reset(2);
 }
@@ -486,11 +527,11 @@ void move_say_no() {
   set_eyes(240, 240, 255, 255);
 
   move(10, head_res_pos, 30, 999, 999, 999, 999, right_arm_res_pos, 60);
-  move(10, 30, 140, 999, 999, 999, 999, 60, 160);
+  move(10, 30, 140, 999, 999, 999, 999, 60, right_arm_max);
   move(20, 140, 40, 999, 999, 999, 999, 999, 999);
   move(20, 40, 130, 999, 999, 999, 999, 999, 999);
-  move(20, 130, 50, 999, 999, 999, 999, 160, 80);
-  move(20, 50, head_res_pos, 999, 999, 999, 999, 80, right_arm_res_pos);
+  move(20, 130, 50, 999, 999, 999, 999, right_arm_max, 70);
+  move(20, 50, head_res_pos, 999, 999, 999, 999, 70, right_arm_res_pos);
   delay(200);
 
   set_eyes(255, 255, 240, 240);
@@ -519,16 +560,16 @@ void move_happy() {
 void move_angry() {
   reset(1);
 
-  move(0, head_res_pos, 110, body_res_pos, 70, left_arm_res_pos, 20, right_arm_res_pos, 160);
+  move(0, head_res_pos, 110, body_res_pos, 70, left_arm_res_pos, 20, right_arm_res_pos, right_arm_max);
   set_eyes(255, 255, 255, 255);
 
   for (int i = 0; i < 5; i++) {
     set_eyes(100, 100, 255, 255);
-    move(20, 110, 70, 70, 110, 20, 0, 160, 130);
+    move(20, 110, 70, 70, 110, 20, left_arm_max, right_arm_max, 130);
     set_eyes(255, 255, 255, 255);
-    move(20, 70, 110, 110, 70, 0, 20, 130, 160);
+    move(20, 70, 110, 110, 70, left_arm_max, 20, 130, right_arm_max);
   }
-  move(0, 110, head_res_pos, 70, body_res_pos, 20, left_arm_res_pos, 160, right_arm_res_pos);
+  move(0, 110, head_res_pos, 70, body_res_pos, 20, left_arm_res_pos, right_arm_max, right_arm_res_pos);
 
   set_eyes(255, 255, 240, 240);
 
@@ -538,14 +579,14 @@ void move_angry() {
 void move_scary() {
   reset(1);
 
-  move(0, head_res_pos, 70, body_res_pos, 40, left_arm_res_pos, 0, right_arm_res_pos, 160);
+  move(0, head_res_pos, 70, body_res_pos, 40, left_arm_res_pos, left_arm_max, right_arm_res_pos, right_arm_max);
   for (int i = 0; i < 4; i++) {
     set_eyes(100, 255, 255, 100);
-    move(20, 70, 110, 40, 140, 0, 10, 160, 140);
+    move(20, 70, 110, 40, 140, left_arm_max, 20, right_arm_max, 130);
     set_eyes(255, 100, 100, 255);
-    move(20, 110, 70, 140, 40, 10, 0, 140, 160);
+    move(20, 110, 70, 140, 40, 20, left_arm_max, 130, right_arm_max);
   }
-  move(0, 70, head_res_pos, 40, body_res_pos, 0, left_arm_res_pos, 160, right_arm_res_pos);
+  move(0, 70, head_res_pos, 40, body_res_pos, left_arm_max, left_arm_res_pos, right_arm_max, right_arm_res_pos);
 
   set_eyes(255, 255, 240, 240);
 
@@ -558,9 +599,9 @@ void move_look_left() {
   move(10, head_res_pos, 130, 999, 999, 999, 999, 999, 999);
   delay(100);
   happy_eyes(700, 1);
-  move(40, 130, 90, body_res_pos, 130, 999, 999, 999, 999);
+  move(40, 130, head_avg, body_res_pos, 130, 999, 999, 999, 999);
   delay(800);
-  move(40, 90, head_res_pos, 130, body_res_pos, 999, 999, 999, 999);
+  move(40, 999, 999, 130, body_res_pos, 999, 999, 999, 999);
 
   reset(2);
 }
@@ -571,9 +612,9 @@ void move_look_right() {
   move(10, head_res_pos, 30, 999, 999, 999, 999, 999, 999);
   delay(100);
   happy_eyes(700, 1);
-  move(40, 30, 90, body_res_pos, 30, 999, 999, 999, 999);
+  move(40, 30, head_avg, body_res_pos, 30, 999, 999, 999, 999);
   delay(800);
-  move(40, 90, head_res_pos, 30, body_res_pos, 999, 999, 999, 999);
+  move(40, 999, 999, 30, body_res_pos, 999, 999, 999, 999);
 
   reset(2);
 }
@@ -581,11 +622,11 @@ void move_look_right() {
 void move_look_around() {
   reset(1);
 
-  move(50, head_res_pos, 10, 999, 999, 999, 999, 999, 999);
-  move(50, 10, 90, 999, 999, 999, 999, 999, 999);
+  move(50, head_res_pos, head_min, 999, 999, 999, 999, 999, 999);
+  move(50, head_min, head_avg, 999, 999, 999, 999, 999, 999);
   delay(200);
-  move(50, 90, 160, 999, 999, 999, 999, 999, 999);
-  move(30, 160, head_res_pos, 999, 999, 999, 999, 999, 999);
+  move(50, head_avg, head_max, 999, 999, 999, 999, 999, 999);
+  move(30, head_max, head_res_pos, 999, 999, 999, 999, 999, 999);
 
   reset(2);
 }
@@ -593,12 +634,12 @@ void move_look_around() {
 void move_turn_left() {
   reset(1);
 
-  move(10, 999, 999, body_res_pos, 150, 999, 999, 999, 999);
+  move(10, 999, 999, body_res_pos, 130, 999, 999, 999, 999);
   delay(100);
   happy_eyes(700, 1);
-  move(40, head_res_pos, 150, 150, body_res_pos, 999, 999, 999, 999);
+  move(40, head_res_pos, 130, 130, body_res_pos, 999, 999, 999, 999);
   delay(800);
-  move(40, 150, head_res_pos, 90, body_res_pos, 999, 999, 999, 999);
+  move(40, 130, head_res_pos, 999, 999, 999, 999, 999, 999);
 
   reset(2);
 }
@@ -611,7 +652,7 @@ void move_turn_right() {
   happy_eyes(700, 1);
   move(40, head_res_pos, 30, 30, body_res_pos, 999, 999, 999, 999);
   delay(800);
-  move(40, 30, head_res_pos, 90, body_res_pos, 999, 999, 999, 999);
+  move(40, 30, head_res_pos, 999, 999, 999, 999, 999, 999);
 
   reset(2);
 }
@@ -619,11 +660,11 @@ void move_turn_right() {
 void move_turn_around() {
   reset(1);
 
-  move(50, 999, 999, body_res_pos, 10, 999, 999, 999, 999);
-  move(50, 999, 999, 10, 90, 999, 999, 999, 999);
+  move(50, 999, 999, body_res_pos, body_min, 999, 999, 999, 999);
+  move(50, 999, 999, body_min, body_avg, 999, 999, 999, 999);
   delay(200);
-  move(50, 999, 999, 90, 160, 999, 999, 999, 999);
-  move(30, 999, 999, 160, body_res_pos, 999, 999, 999, 999);
+  move(50, 999, 999, body_avg, body_max, 999, 999, 999, 999);
+  move(30, 999, 999, body_max, body_res_pos, 999, 999, 999, 999);
 
   reset(2);
 }
@@ -659,21 +700,21 @@ void move_point_right() {
 void move_workout_arms() {
   reset(1);
 
-  move(40, 999, 999, 999, 999, 999, 999, right_arm_res_pos, 160);
+  move(40, 999, 999, 999, 999, 999, 999, right_arm_res_pos, right_arm_max);
   delay(500);
 
   for (int i = 0; i < 3; i++) {
     set_eyes(240, 240, 240, 240);
-    move(20, 999, 999, 999, 999, 160, 0, 160, 0);
+    move(20, 999, 999, 999, 999, left_arm_res_pos, left_arm_max, right_arm_max, 0);
     set_eyes(255, 255, 240, 240);
-    move(20, 999, 999, 999, 999, 0, 160, 0, 160);
+    move(20, 999, 999, 999, 999, left_arm_max, left_arm_min, 0, right_arm_max);
   }
 
   set_eyes(240, 240, 240, 240);
-  move(20, 999, 999, 999, 999, 160, 0, 160, 0);
+  move(20, 999, 999, 999, 999, left_arm_min, left_arm_max, right_arm_max, right_arm_res_pos);
   set_eyes(255, 255, 240, 240);
   delay(500);
-  move(40, 999, 999, 999, 999, 0, left_arm_res_pos, 999, 999);
+  move(40, 999, 999, 999, 999, left_arm_max, left_arm_res_pos, 999, 999);
 
   reset(2);
 }
@@ -681,23 +722,23 @@ void move_workout_arms() {
 void move_workout_neck() {
   reset(1);
 
-  move(40, 999, 999, 999, 999, left_arm_res_pos, 70, right_arm_res_pos, 160);
+  move(40, 999, 999, 999, 999, left_arm_res_pos, left_arm_avg, right_arm_res_pos, right_arm_max);
   delay(500);
   move(50,  head_res_pos, 30, 999, 999, 999, 999, 999, 999);
   delay(500);
 
   for (int i = 0; i < 3; i++) {
     set_eyes(240, 240, 240, 240);
-    move(30, 30, 150, 999, 999, 70, 0, 160, 90);
+    move(30, 30, 150, 999, 999, left_arm_avg, left_arm_max, right_arm_max, right_arm_avg);
     set_eyes(255, 255, 240, 240);
-    move(30, 150, 30, 999, 999, 0, 70, 90, 160);
+    move(30, 150, 30, 999, 999, left_arm_max, left_arm_avg, right_arm_avg, right_arm_max);
   }
 
   delay(500);
   move(50, 30, head_res_pos, 999, 999, 999, 999, 999, 999);
   delay(500);
-  move(40, 999, 999, 999, 999, 999, 999, 160, 90);
-  move(40, 999, 999, 999, 999, 70, left_arm_res_pos, 90, right_arm_res_pos);
+  move(40, 999, 999, 999, 999, 999, 999, right_arm_max, right_arm_avg);
+  move(40, 999, 999, 999, 999, left_arm_avg, left_arm_res_pos, right_arm_avg, right_arm_res_pos);
 
   reset(2);
 }
@@ -705,7 +746,7 @@ void move_workout_neck() {
 void move_workout_waist() {
   reset(1);
 
-  move(40, 999, 999, 999, 999, left_arm_res_pos, 70, right_arm_res_pos, 90);
+  move(40, 999, 999, 999, 999, left_arm_res_pos, left_arm_avg, right_arm_res_pos, right_arm_avg);
   delay(500);
   move(50, head_res_pos, 30, body_res_pos, 150, 999, 999, 999, 999);
   delay(500);
@@ -720,7 +761,7 @@ void move_workout_waist() {
   delay(500);
   move(50, 30, head_res_pos, 150, head_res_pos, 999, 999, 999, 999);
   delay(500);
-  move(40, 999, 999, 999, 999, 70, left_arm_res_pos, 90, right_arm_res_pos);
+  move(40, 999, 999, 999, 999, left_arm_avg, left_arm_res_pos, right_arm_avg, right_arm_res_pos);
 
   reset(2);
 }
@@ -732,14 +773,14 @@ void move_dance() {
   int head2;
   int body1 = body_res_pos;
   int body2;
-  int left_arm1 = 70;
+  int left_arm1 = left_arm_avg;
   int left_arm2;
-  int right_arm1 = 90;
+  int right_arm1 = right_arm_avg;
   int right_arm2;
 
   reset(1);
 
-  move(40, 999, 999, 999, 999, left_arm_res_pos, 70, right_arm_res_pos, 90);
+  move(40, 999, 999, 999, 999, left_arm_res_pos, left_arm_avg, right_arm_res_pos, right_arm_avg);
   delay(500);
 
   for (int i = 0; i < 10; i++) {
@@ -795,10 +836,10 @@ void move_random_1() {
   reset(1);
 
   for (int i = 0; i < 15; i++) {
-    head2 = step_move_prog * random(int(30 / step_move_prog + 1), int(150 / step_move_prog + 1));
-    body2 = step_move_prog * random(int(30 / step_move_prog + 1), int(150 / step_move_prog + 1));
-    left_arm2 = step_move_prog * random(0, int(160 / step_move_prog + 1));
-    right_arm2 = step_move_prog * random(0, int(160 / step_move_prog + 1));
+    head2 = step_move_prog * random(int(head_min / step_move_prog + 1), int(head_max / step_move_prog + 1));
+    body2 = step_move_prog * random(int(body_min / step_move_prog + 1), int(body_max / step_move_prog + 1));
+    left_arm2 = step_move_prog * random(left_arm_max, int(left_arm_min / step_move_prog + 1));
+    right_arm2 = step_move_prog * random(right_arm_min, int(right_arm_max / step_move_prog + 1));
     time_to_move=random(10, 101);
     time_to_stay=random(10, 501);
 
@@ -832,19 +873,19 @@ void move_random_2() {
   reset(1);
 
   for (int i = 0; i < 15; i++) {
-    head2 = step_move_prog * random(int(20 / step_move_prog + 1), int(160 / step_move_prog + 1));
+    head2 = step_move_prog * random(int(head_min / step_move_prog + 1), int(head_max / step_move_prog + 1));
     if (random(1,3) == 1) {
-      body2 = step_move_prog * random(int(20 / step_move_prog + 1), int(160 / step_move_prog + 1));
+      body2 = step_move_prog * random(int(body_min / step_move_prog + 1), int(head_max / step_move_prog + 1));
     } else {
       body2 = body1;
     }
     if (random(1,4) == 1) {
-      left_arm2 = step_move_prog * random(0, int(160 / step_move_prog + 1));
+      left_arm2 = step_move_prog * random(left_arm_max, int(left_arm_min / step_move_prog + 1));
     } else {
       left_arm2 = left_arm1;
     }
     if (random(1,4) == 1) {
-      right_arm2 = step_move_prog * random(0, int(160 / step_move_prog + 1));
+      right_arm2 = step_move_prog * random(right_arm_min, int(right_arm_max / step_move_prog + 1));
     } else {
       right_arm2 = right_arm1;
     }
@@ -863,7 +904,7 @@ void move_random_2() {
 
 void move_head(int direc) {
   int head_pos_aux = head_pos + direc * step_move_free;
-  if (head_pos_aux > 19 && head_pos_aux < 161) {
+  if (head_pos_aux >= head_min && head_pos_aux <= head_max) {
     move(10, head_pos, head_pos_aux, 999, 999, 999, 999, 999, 999);
     head_pos = head_pos_aux;
   }
@@ -871,7 +912,7 @@ void move_head(int direc) {
 
 void move_body(int direc) {
   int body_pos_aux = body_pos + direc * step_move_free;
-  if (body_pos_aux > 19 && body_pos_aux < 161) {
+  if (body_pos_aux >= body_min && body_pos_aux <= body_max) {
     move(10, 999, 999, body_pos, body_pos_aux, 999, 999, 999, 999);
     body_pos = body_pos_aux;
   }
@@ -879,7 +920,7 @@ void move_body(int direc) {
 
 void move_left_arm(int direc) {
   int left_arm_pos_aux = left_arm_pos + direc * step_move_free;
-  if (left_arm_pos_aux > -1 && left_arm_pos_aux < 161) {
+  if (left_arm_pos_aux >= left_arm_max && left_arm_pos_aux <= left_arm_min) {
     move(10, 999, 999, 999, 999, left_arm_pos, left_arm_pos_aux, 999, 999);
     left_arm_pos = left_arm_pos_aux;
   }
@@ -887,7 +928,7 @@ void move_left_arm(int direc) {
 
 void move_right_arm(int direc) {
   int right_arm_pos_aux = right_arm_pos + direc * step_move_free;
-  if (right_arm_pos_aux > -1 && right_arm_pos_aux < 161) {
+  if (right_arm_pos_aux >= right_arm_min && right_arm_pos_aux <= right_arm_max) {
     move(10, 999, 999, 999, 999, 999, 999, right_arm_pos, right_arm_pos_aux);
     right_arm_pos = right_arm_pos_aux;
   }
@@ -904,19 +945,19 @@ void move_auto() {
   if (prox_sensor > 400) {
     move_angry();
   } else if (prox_sensor > 100) {
-    head2 = step_move_prog * random(int(20 / step_move_prog + 1), int(160 / step_move_prog + 1));
+    head2 = step_move_prog * random(int(head_min / step_move_prog + 1), int(head_max / step_move_prog + 1));
     if (random(1,3) == 1) {
-      body2 = step_move_prog * random(int(20 / step_move_prog + 1), int(160 / step_move_prog + 1));
+      body2 = step_move_prog * random(int(body_min / step_move_prog + 1), int(body_max / step_move_prog + 1));
     } else {
       body2 = body_pos;
     }
     if (random(1,4) == 1) {
-      left_arm2 = step_move_prog * random(0, int(160 / step_move_prog + 1));
+      left_arm2 = step_move_prog * random(left_arm_max, int(left_arm_min / step_move_prog + 1));
     } else {
       left_arm2 = left_arm_pos;
     }
     if (random(1,4) == 1) {
-      right_arm2 = step_move_prog * random(0, int(160 / step_move_prog + 1));
+      right_arm2 = step_move_prog * random(right_arm_min, int(right_arm_max / step_move_prog + 1));
     } else {
       right_arm2 = right_arm_pos;
     }
@@ -948,49 +989,49 @@ void move_auto() {
 }
 
 void move_simon(int mode, int time) {
-  int head1 = 90;
-  int body1 = 90;
-  int left_arm1 = 70;
-  int right_arm1 = 90;
+  int head1 = head_avg;
+  int body1 = body_avg;
+  int left_arm1 = left_arm_avg;
+  int right_arm1 = right_arm_avg;
 
   switch (mode) {
     case 1:
-      move(time, 90, 20, 999, 999, 999, 999, 999, 999);
-      head1 = 20;
+      move(time, head_avg, head_min, 999, 999, 999, 999, 999, 999);
+      head1 = head_min;
       break;
     case 2:
-      move(time, 90, 160, 999, 999, 999, 999, 999, 999);
-      head1 = 160;
+      move(time, head_avg, head_max, 999, 999, 999, 999, 999, 999);
+      head1 = head_max;
       break;
     case 3:
-      move(time, 999, 999, 90, 20, 999, 999, 999, 999);
-      body1 = 20;
+      move(time, 999, 999, body_avg, body_min, 999, 999, 999, 999);
+      body1 = body_min;
       break;
     case 4:
-      move(time, 999, 999, 90, 160, 999, 999, 999, 999);
-      body1 = 160;
+      move(time, 999, 999, body_avg, body_max, 999, 999, 999, 999);
+      body1 = body_max;
       break;
     case 5:
-      move(time, 999, 999, 999, 999, 70, 0, 999, 999);
-      left_arm1 = 0;
+      move(time, 999, 999, 999, 999, left_arm_avg, left_arm_max, 999, 999);
+      left_arm1 = left_arm_max;
       break;
     case 6:
-      move(time, 999, 999, 999, 999, 70, 160, 999, 999);
-      left_arm1 = 160;
+      move(time, 999, 999, 999, 999, left_arm_avg, left_arm_min, 999, 999);
+      left_arm1 = left_arm_min;
       break;
     case 7:
-      move(time, 999, 999, 999, 999, 999, 999, 90, 160);
-      right_arm1 = 160;
+      move(time, 999, 999, 999, 999, 999, 999, right_arm_avg, right_arm_max);
+      right_arm1 = right_arm_max;
       break;
     case 8:
-      move(time, 999, 999, 999, 999, 999, 999, 90, 0);
-      right_arm1 = 0;
+      move(time, 999, 999, 999, 999, 999, 999, right_arm_avg, right_arm_min);
+      right_arm1 = right_arm_min;
       break;
     case 9:
-      motor1.write(90);
-      motor2.write(90);
-      motor3.write(70);
-      motor4.write(90);
+      motor1.write(head_avg);
+      motor2.write(body_avg);
+      motor3.write(left_arm_avg);
+      motor4.write(right_arm_avg);
       happy_eyes(100, 7);
       break;
   }
@@ -1001,14 +1042,14 @@ void move_simon(int mode, int time) {
 }
 
 void move_count(int number) {
-  int head_pos = map(number/100, 0, 3, 90, 20);
-  int right_arm_pos =  map(number%100/10, 0, 9, 0, 160);
-  int left_arm_pos = map(number%10, 0, 9, 160, 0);
+  int head_pos = map(number/100, 0, 3, head_avg, head_min);
+  int right_arm_pos =  map(number%100/10, 0, 9, right_arm_min, right_arm_max);
+  int left_arm_pos = map(number%10, 0, 9, left_arm_min, left_arm_max);
   
   set_eyes(100, 100, 255, 255);
 
   motor1.write(head_pos);
-  motor2.write(90);
+  motor2.write(body_avg);
   motor3.write(left_arm_pos);
   motor4.write(right_arm_pos);
   delay(100);
@@ -1016,7 +1057,19 @@ void move_count(int number) {
   set_eyes(255, 255, 240, 240);
 }
 
-void execute_option() {
+void execute_option(int option, int parameter) {
+  #ifdef DEBUG
+    Serial.print("Option: ");
+    Serial.println(option);
+    Serial.print("Parameter: ");
+    Serial.println(parameter);
+  #endif
+
+  check_sleep(1);
+
+  // THIS IS TO AVOID TO BLINK JUST AFTER EXECUTING A OPTION
+  time_to_blink = millis() + random(3000, 7000);
+
   switch (option) {
     case 1:
       autom=!autom;
@@ -1152,15 +1205,15 @@ void execute_option() {
 //============================================================================//
 
 void loop() {
+  check_sleep(0);
+
   check_proximity();
   check_count();
+  check_serial();
   check_bluetooth();
-  check_sleep(0);
 
   if (! sleep) {
     check_blink();
-
-    execute_option();
 
     if (autom) {
       move_auto();

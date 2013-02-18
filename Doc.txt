@@ -114,11 +114,14 @@ Version 2.3.0 - 21-Jul-12
 
 - Some adjusts in "Auto" movements
 
-Version x.x.x - xx-xxx-xx
+Version 2.4.0 - xx-xxx-xx
 -------------
 
 - Some "auto" mode improvements
 
+- Added control by the Serial Port
+
+- Created variables for head_min, head_avg, head_max, body_min etc
 
 =====
 IDEAS
