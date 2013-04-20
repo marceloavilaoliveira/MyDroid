@@ -18,6 +18,9 @@
 // SERVO LIBRARY
 #include <Servo.h>
 
+// PITCHES LIBRARY
+#include <Pitches.h>
+
 //============================================================================//
 // VARIABLES                                                                  //
 //============================================================================//
@@ -30,7 +33,7 @@ Servo motor4;
 
 // PINS
 int count_pin = 5;
-int right_blue_eye_pin = 9;
+int right_blue_eye_pin = 8;
 int right_red_eye_pin = 10;
 int left_blue_eye_pin = 11;
 int left_red_eye_pin = 12;
@@ -39,6 +42,7 @@ int body_pin = 26;
 int left_arm_pin = 28;
 int right_arm_pin = 30;
 int prox_sensor_pin = A2;
+int speaker_pin = 4;
 
 // POSITIONS
 // HEAD
@@ -83,6 +87,63 @@ int count_state = 0;
 int count_state_prev = 0;
 float prox_sensor;
 
+// MUSIC
+int music_num[4] = { 8, 20, 18, 22 };
+
+int music_notes[4][24] = {
+                           {
+                             // TA-TA-TA-TA-TA TA-TA
+                             NOTE_C4, NOTE_G3, NOTE_G3, NOTE_A3, NOTE_G3, 0, NOTE_B3, NOTE_C4,
+                             0, 0, 0, 0, 0, 0, 0, 0,
+                             0, 0, 0, 0, 0, 0, 0, 0
+                           },
+                           {
+                             // STAR WARS
+                             NOTE_D3, NOTE_D3, NOTE_D3, NOTE_G3, NOTE_D4, NOTE_C4, NOTE_B3, NOTE_A3,
+                             NOTE_G4, NOTE_D4, NOTE_C4, NOTE_B3, NOTE_A3, NOTE_G4, NOTE_D4, NOTE_C4,
+                             NOTE_B3, NOTE_C4, NOTE_A3, 0, 0, 0, 0, 0
+                           },
+                           {
+                             // IMPERIAL MARCH
+                             NOTE_A3, NOTE_A3, NOTE_A3, NOTE_F3, NOTE_C4, NOTE_A3, NOTE_F3, NOTE_C4,
+                             NOTE_A3, NOTE_E4, NOTE_E4, NOTE_E4, NOTE_F4, NOTE_C4, NOTE_GS3, NOTE_F3,
+                             NOTE_C4, NOTE_A3, 0, 0, 0, 0, 0, 0
+                           },
+                           {
+                             // JAMES BOND
+                             NOTE_DS5, NOTE_D5, NOTE_B4, NOTE_A4, NOTE_B4, NOTE_E4, NOTE_G4, NOTE_DS5,
+                             NOTE_D5, NOTE_G4, NOTE_B4, NOTE_B4, NOTE_FS5, NOTE_F5, NOTE_B4, NOTE_D5,
+                             NOTE_AS5, NOTE_A5, NOTE_F5, NOTE_A5, NOTE_DS6, NOTE_D6, 0 , 0
+                           }
+                         };
+
+int music_durat[4][24] = {
+                           {
+                             // TA-TA-TA-TA-TA TA-TA
+                             4, 8, 8, 4, 4, 4, 4, 4,
+                             0, 0, 0, 0, 0, 0, 0, 0,
+                             0, 0, 0, 0, 0, 0, 0, 0
+                           },
+                           {
+                             // STAR WARS
+                             10, 10, 10, 2, 2, 10, 10, 10,
+                             2, 4, 10, 10, 10, 2, 4, 10,
+                             10, 10, 2, 4, 0, 0, 0, 0
+                           },
+                           {
+                             // IMPERIAL MARCH
+                             3, 3, 3, 6, 8, 3, 6, 8,
+                             2, 3, 3, 3, 6, 8, 3, 6,
+                             8, 2, 0, 0, 0, 0, 0, 0
+                           },
+                           {
+                             // JAMES BOND
+                             8, 2, 8, 8, 1, 8, 4, 8,
+                             4, 8, 8, 8, 8, 4, 8, 4,
+                             8, 4, 8, 4, 8, 3, 0, 0
+                           }
+                         };
+
 //============================================================================//
 // FUNCTIONS (SETUP)                                                          //
 //============================================================================//
@@ -99,6 +160,7 @@ void setup() {
   motor3.attach(left_arm_pin);
   motor4.attach(right_arm_pin);
   pinMode(prox_sensor_pin, INPUT);
+  pinMode(speaker_pin, OUTPUT);
 
   // INITIATE SERIAL COMMUNICATION
   Serial.begin(9600);
@@ -133,6 +195,39 @@ void setup_bluetooth() {
 //============================================================================//
 // FUNCTIONS (BASIC)                                                          //
 //============================================================================//
+
+void play_music(int music) {
+  // MUSIC:
+  // 0 = TA-TA-TA-TA TA-TA
+  // 1 = STAR WARS
+  // 2 = IMPERIAL MARCH
+  // 3 = JAMES BOND
+  int eyes = 0;
+  for (int thisNote = 0; thisNote < music_num[music]; thisNote++) {
+    // to calculate the note duration, take one second 
+    // divided by the note type.
+    // e.g. quarter note = 1000 / 4, eighth note = 1000/8, etc.
+    int noteDuration = 1000/music_durat[music][thisNote];
+    tone(speaker_pin, music_notes[music][thisNote], noteDuration);
+
+    // to distinguish the notes, set a minimum time between them.
+    // the note's duration + 30% seems to work well:
+    int pauseBetweenNotes = noteDuration * 1.30;
+
+    if (eyes == 1) {
+      eyes = 0;
+      set_eyes(255, 255, 255, 255);
+    } else {
+      eyes = 1;
+      set_eyes(255, 255, 100, 100);
+    }
+    delay(pauseBetweenNotes);
+    // stop the tone playing:
+    noTone(speaker_pin);
+  }
+
+  set_eyes(255, 255, 240, 240);
+}
 
 void read_prox_sensor() {
   prox_sensor = 0;
@@ -451,25 +546,37 @@ void scary_eyes(int time, int repeat) {
 void move_check() {
   reset(1);
 
-  // HEAD
+  // HEAD + RED EYES
+  set_eyes(100, 100, 255, 255);
   move(30, head_res_pos, head_min, 999, 999, 999, 999, 999, 999);
   move(30, head_min, head_max, 999, 999, 999, 999, 999, 999);
   move(30, head_max, head_res_pos, 999, 999, 999, 999, 999, 999);
-  // BODY
+  // BODY + BLUE EYES
+  set_eyes(255, 255, 100, 100);
   move(30, 999, 999, body_res_pos, body_min, 999, 999, 999, 999);
   move(30, 999, 999, body_min, body_max, 999, 999, 999, 999);
   move(30, 999, 999, body_max, body_res_pos, 999, 999, 999, 999);
-  // LEFT ARM
+  set_eyes(255, 255, 240, 240);
+  // LEFT ARM + RED EYES
+  set_eyes(100, 100, 255, 255);
   move(30, 999, 999, 999, 999, left_arm_res_pos, left_arm_max, 999, 999);
   move(30, 999, 999, 999, 999, left_arm_max, left_arm_res_pos, 999, 999);
-  // RIGHT ARM
+  // RIGHT ARM + BLUE EYES
+  set_eyes(255, 255, 100, 100);
   move(30, 999, 999, 999, 999, 999, 999, right_arm_res_pos, right_arm_max);
   move(30, 999, 999, 999, 999, 999, 999, right_arm_max, right_arm_res_pos);
-  // EYES
   set_eyes(255, 255, 255, 255);
-  delay(300);
-  set_eyes(240, 240, 255, 255);
-  delay(300);
+  delay(200);
+  // RED EYES
+  set_eyes(100, 100, 255, 255);
+  delay(800);
+  set_eyes(255, 255, 255, 255);
+  delay(200);
+  // BLUE EYES
+  set_eyes(255, 255, 100, 100);
+  delay(800);
+  set_eyes(255, 255, 255, 255);
+  delay(200);
   set_eyes(255, 255, 240, 240);
 
   reset(2);
@@ -697,6 +804,62 @@ void move_point_right() {
   reset(2);
 }
 
+void move_monitor_left() {
+  reset(1);
+
+  move(40, head_res_pos, head_min, body_res_pos, body_min, 999, 999, 999, 999);
+  move(40, head_min, head_max, body_min, body_max, 999, 999, 999, 999);
+  delay(500);
+  move(20, 999, 999, 999, 999, left_arm_res_pos, 40, 999, 999);
+  delay(500);
+  move(20, 999, 999, 999, 999, 40, 80, 999, 999);
+  move(20, 999, 999, 999, 999, 80, 40, 999, 999);
+  move(20, 999, 999, 999, 999, 40, 80, 999, 999);
+  move(20, 999, 999, 999, 999, 80, 40, 999, 999);
+  play_music(0);
+  move(40, head_max, head_res_pos, body_max, body_res_pos, 40, left_arm_res_pos, 999, 999);
+
+  reset(2);
+}
+
+void move_monitor_right() {
+  reset(1);
+
+  move(40, head_res_pos, head_max, body_res_pos, body_max, 999, 999, 999, 999);
+  move(40, head_max, head_min, body_max, body_min, 999, 999, 999, 999);
+  delay(500);
+  move(20, 999, 999, 999, 999, 999, 999, right_arm_res_pos, 120);
+  delay(500);
+  move(20, 999, 999, 999, 999, 999, 999, 120, 80);
+  move(20, 999, 999, 999, 999, 999, 999, 80, 120);
+  move(20, 999, 999, 999, 999, 999, 999, 120, 80);
+  move(20, 999, 999, 999, 999, 999, 999, 80, 120);
+  play_music(2);
+  move(40, head_min, head_res_pos, body_min, body_res_pos, 999, 999, 120, right_arm_res_pos);
+
+  reset(2);
+}
+
+void move_monitor_center() {
+  reset(1);
+
+  move(40, head_res_pos, head_min, body_res_pos, body_min, 999, 999, 999, 999);
+  move(40, head_min, head_max, body_min, body_max, 999, 999, 999, 999);
+  move(40, head_max, head_res_pos, body_max, body_res_pos, 999, 999, 999, 999);
+  delay(500);
+  move(20, 999, 999, 999, 999, left_arm_res_pos, left_arm_max, right_arm_res_pos, right_arm_max);
+  delay(500);
+  move(20, 999, 999, 999, 999, left_arm_max, left_arm_max+40, 999, 999);
+  move(20, 999, 999, 999, 999, left_arm_max+40, left_arm_max, right_arm_max, right_arm_max-40);
+  move(20, 999, 999, 999, 999, left_arm_max, left_arm_max+40, right_arm_max-40, right_arm_max);
+  move(20, 999, 999, 999, 999, left_arm_max+40, left_arm_max, right_arm_max, right_arm_max-40);
+  move(20, 999, 999, 999, 999, 999, 999, right_arm_max-40, right_arm_max);
+  play_music(1);
+  move(40, 999, 999, 999, 999, left_arm_max, left_arm_res_pos, right_arm_max, right_arm_res_pos);
+
+  reset(2);
+}
+
 void move_workout_arms() {
   reset(1);
 
@@ -765,8 +928,6 @@ void move_workout_waist() {
 
   reset(2);
 }
-
-// set_eyes(xxxxx);
 
 void move_dance() {
   int head1 = head_res_pos;
@@ -1133,6 +1294,15 @@ void execute_option(int option, int parameter) {
       break;
     case 21:
       move_check();
+      break;
+    case 22:
+      move_monitor_left();
+      break;
+    case 23:
+      move_monitor_right();
+      break;
+    case 24:
+      move_monitor_center();
       break;
     case 51:
       move_head(-1);
