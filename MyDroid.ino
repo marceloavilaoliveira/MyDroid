@@ -1,7 +1,7 @@
 //============================================================================//
 //                        Marcelo Avila de Oliveira                           //
 //                                                                            //
-//          MyDroid.ino - Version 2.3.0 - Android Figure Automation           //
+//          MyDroid.ino - Version 2.4.0 - Android Figure Automation           //
 //============================================================================//
 
 //============================================================================//
@@ -18,7 +18,7 @@
 // SERVO LIBRARY
 #include <Servo.h>
 
-// PITCHES LIBRARY
+// SOUND LIBRARY
 #include <Pitches.h>
 
 //============================================================================//
@@ -87,10 +87,10 @@ int count_state = 0;
 int count_state_prev = 0;
 float prox_sensor;
 
-// MUSIC
-int music_num[4] = { 8, 20, 18, 22 };
+// SOUND
+int sound_num[4] = { 8, 20, 18, 22 };
 
-int music_notes[4][24] = {
+int sound_notes[4][24] = {
                            {
                              // TA-TA-TA-TA-TA TA-TA
                              NOTE_C4, NOTE_G3, NOTE_G3, NOTE_A3, NOTE_G3, 0, NOTE_B3, NOTE_C4,
@@ -117,7 +117,7 @@ int music_notes[4][24] = {
                            }
                          };
 
-int music_durat[4][24] = {
+int sound_durat[4][24] = {
                            {
                              // TA-TA-TA-TA-TA TA-TA
                              4, 8, 8, 4, 4, 4, 4, 4,
@@ -196,19 +196,19 @@ void setup_bluetooth() {
 // FUNCTIONS (BASIC)                                                          //
 //============================================================================//
 
-void play_music(int music) {
-  // MUSIC:
+void play_sound(int sound) {
+  // SOUND:
   // 0 = TA-TA-TA-TA TA-TA
   // 1 = STAR WARS
   // 2 = IMPERIAL MARCH
   // 3 = JAMES BOND
   int eyes = 0;
-  for (int thisNote = 0; thisNote < music_num[music]; thisNote++) {
+  for (int thisNote = 0; thisNote < sound_num[sound]; thisNote++) {
     // to calculate the note duration, take one second 
     // divided by the note type.
     // e.g. quarter note = 1000 / 4, eighth note = 1000/8, etc.
-    int noteDuration = 1000/music_durat[music][thisNote];
-    tone(speaker_pin, music_notes[music][thisNote], noteDuration);
+    int noteDuration = 1000/sound_durat[sound][thisNote];
+    tone(speaker_pin, sound_notes[sound][thisNote], noteDuration);
 
     // to distinguish the notes, set a minimum time between them.
     // the note's duration + 30% seems to work well:
@@ -578,6 +578,7 @@ void move_check() {
   set_eyes(255, 255, 255, 255);
   delay(200);
   set_eyes(255, 255, 240, 240);
+  play_sound(0);
 
   reset(2);
 }
@@ -804,7 +805,10 @@ void move_point_right() {
   reset(2);
 }
 
-void move_monitor_left() {
+void move_monitor_left(int sound) {
+  // SOUND:
+  // 0 = NO SOUND
+  // 1 = PLAY SOUND
   reset(1);
 
   move(40, head_res_pos, head_min, body_res_pos, body_min, 999, 999, 999, 999);
@@ -816,13 +820,20 @@ void move_monitor_left() {
   move(20, 999, 999, 999, 999, 80, 40, 999, 999);
   move(20, 999, 999, 999, 999, 40, 80, 999, 999);
   move(20, 999, 999, 999, 999, 80, 40, 999, 999);
-  play_music(0);
+
+  if (sound == 1) {
+    play_sound(0);
+  }
+
   move(40, head_max, head_res_pos, body_max, body_res_pos, 40, left_arm_res_pos, 999, 999);
 
   reset(2);
 }
 
-void move_monitor_right() {
+void move_monitor_right(int sound) {
+  // SOUND:
+  // 0 = NO SOUND
+  // 1 = PLAY SOUND
   reset(1);
 
   move(40, head_res_pos, head_max, body_res_pos, body_max, 999, 999, 999, 999);
@@ -834,13 +845,20 @@ void move_monitor_right() {
   move(20, 999, 999, 999, 999, 999, 999, 80, 120);
   move(20, 999, 999, 999, 999, 999, 999, 120, 80);
   move(20, 999, 999, 999, 999, 999, 999, 80, 120);
-  play_music(2);
+
+  if (sound == 1) {
+    play_sound(2);
+  }
+
   move(40, head_min, head_res_pos, body_min, body_res_pos, 999, 999, 120, right_arm_res_pos);
 
   reset(2);
 }
 
-void move_monitor_center() {
+void move_monitor_center(int sound) {
+  // SOUND:
+  // 0 = NO SOUND
+  // 1 = PLAY SOUND
   reset(1);
 
   move(40, head_res_pos, head_min, body_res_pos, body_min, 999, 999, 999, 999);
@@ -854,7 +872,11 @@ void move_monitor_center() {
   move(20, 999, 999, 999, 999, left_arm_max, left_arm_max+40, right_arm_max-40, right_arm_max);
   move(20, 999, 999, 999, 999, left_arm_max+40, left_arm_max, right_arm_max, right_arm_max-40);
   move(20, 999, 999, 999, 999, 999, 999, right_arm_max-40, right_arm_max);
-  play_music(1);
+
+  if (sound == 1) {
+    play_sound(1);
+  }
+
   move(40, 999, 999, 999, 999, left_arm_max, left_arm_res_pos, right_arm_max, right_arm_res_pos);
 
   reset(2);
@@ -1296,13 +1318,16 @@ void execute_option(int option, int parameter) {
       move_check();
       break;
     case 22:
-      move_monitor_left();
+      move_monitor_left(parameter);
       break;
     case 23:
-      move_monitor_right();
+      move_monitor_right(parameter);
       break;
     case 24:
-      move_monitor_center();
+      move_monitor_center(parameter);
+      break;
+    case 25:
+      play_sound(parameter);
       break;
     case 51:
       move_head(-1);

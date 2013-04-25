@@ -114,7 +114,7 @@ Version 2.3.0 - 21-Jul-12
 
 - Some adjusts in "Auto" movements
 
-Version 2.4.0 - 20-Apr-13
+Version 2.4.0 - 24-Apr-13
 -------------
 
 - Some "auto" mode improvements
@@ -125,35 +125,43 @@ Version 2.4.0 - 20-Apr-13
 
 - Created a perl program prototype to send commands for Arduino using serial port
 
-- Added pitches library for play musics
+- Added sound library and a play_sound function to play sounds
 
-- Added 4 musics: Ta-Ta-Ta-Ta-Ta Ta-Ta, Star Wars, Imperial March and James Bond
+- Added 4 sounds: Ta-Ta-Ta-Ta-Ta Ta-Ta, Star Wars, Imperial March and James Bond
 
-- Added move_monitor_left, right and center functions
+- Added Ta-Ta sound to move_check function
 
-=====
+- Added move_monitor_left, move_monitor_right and move_monitor_center functions
+
+TO DO
+-----
+
+- Fazer mydroid-monitor.pl
+  receber 2 parametros: pos(left|center|right) e sound(on|off)
+  testar se conexao USB esta disponivel
+
+- Acertar MyDroid (Android)
+  adicionar "play sounds" (3 musicas, ou 4?)
+  adicionar move_monitor?
+
+=======
+ROADMAP
+=======
+
 IDEAS
-=====
+-----
 
 - 4-bit maze
 - My_Clock => My_Droid
 - Sound / Syntesis
 
-=====
-DO TO
-=====
 
-Arduino
--------
+TO DO
+-----
 
 
 
-Android
--------
-
-
-
-Arduino / Android
------------------
+ISSUES
+------
 
 - Remover o token 147? Remover "while !ok"?
