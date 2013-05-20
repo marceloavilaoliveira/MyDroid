@@ -133,16 +133,11 @@ Version 2.4.0 - 24-Apr-13
 
 - Added move_monitor_left, move_monitor_right and move_monitor_center functions
 
+- Added MyDroid.pl script to send commands to MyDroid through Serial Port
+
 TO DO
 -----
 
-- Fazer mydroid-monitor.pl
-  receber 2 parametros: pos(left|center|right) e sound(on|off)
-  testar se conexao USB esta disponivel
-
-- Acertar MyDroid (Android)
-  adicionar "play sounds" (3 musicas, ou 4?)
-  adicionar move_monitor?
 
 =======
 ROADMAP
@@ -151,9 +146,23 @@ ROADMAP
 IDEAS
 -----
 
+- Refazer "Side" movements:
+
+ 9 - move_look_left      = ok
+10 - move_look_right     = ok
+   - move_look_around    = change to move_look_center and check
+11 - move_turn_left      = ok
+12 - move_turn_right     = ok
+   - move_turn_around    = change to move_turn_center and check
+13 - move_point_left     = ok
+14 - move_point_right    = ok
+   - move_point_center   = to do
+22 - move_monitor_left   = ok
+23 - move_monitor_right  = ok
+24 - move_monitor_center = ok
+
 - 4-bit maze
 - My_Clock => My_Droid
-- Sound / Syntesis
 
 
 TO DO
