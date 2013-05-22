@@ -567,18 +567,6 @@ void move_check() {
     move(30, 999, 999, 999, 999, 999, 999, right_arm_res_pos, right_arm_max);
     move(30, 999, 999, 999, 999, 999, 999, right_arm_max, right_arm_res_pos);
     set_eyes(255, 255, 255, 255);
-    delay(200);
-    // RED EYES
-    set_eyes(100, 100, 255, 255);
-    delay(800);
-    set_eyes(255, 255, 255, 255);
-    delay(200);
-    // BLUE EYES
-    set_eyes(255, 255, 100, 100);
-    delay(800);
-    set_eyes(255, 255, 255, 255);
-    delay(200);
-    set_eyes(255, 255, 240, 240);
     play_sound(0);
 
     reset(2);
@@ -822,7 +810,9 @@ void move_monitor_left(int sound) {
     move(20, 999, 999, 999, 999, 40, 80, 999, 999);
     move(20, 999, 999, 999, 999, 80, 40, 999, 999);
 
-    if (sound == 1) {
+    if (sound == 0) {
+        happy_eyes(100, 7);
+    } else {
         play_sound(0);
     }
 
@@ -847,7 +837,9 @@ void move_monitor_right(int sound) {
     move(20, 999, 999, 999, 999, 999, 999, 120, 80);
     move(20, 999, 999, 999, 999, 999, 999, 80, 120);
 
-    if (sound == 1) {
+    if (sound == 0) {
+        happy_eyes(100, 7);
+    } else {
         play_sound(2);
     }
 
@@ -874,7 +866,9 @@ void move_monitor_center(int sound) {
     move(20, 999, 999, 999, 999, left_arm_max+40, left_arm_max, right_arm_max, right_arm_max-40);
     move(20, 999, 999, 999, 999, 999, 999, right_arm_max-40, right_arm_max);
 
-    if (sound == 1) {
+    if (sound == 0) {
+        happy_eyes(100, 10);
+    } else {
         play_sound(1);
     }
 
