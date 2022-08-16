@@ -1,7 +1,6 @@
 //----------------------------------------------------------------------------//
-// Pathname    : MyDroid.ino                                                  //
-// Description : Android Figure Automation                                    //
-// Version     : 2.4.0                                                        //
+// Description : Android Vinyl Action Figure Automation                       //
+// Version     : 2.5.0                                                        //
 // Author      : Marcelo Avila de Oliveira <marceloavilaoliveira@gmail.com>   //
 //----------------------------------------------------------------------------//
 
@@ -33,7 +32,9 @@ Servo motor3;
 Servo motor4;
 
 // PINS
+int speaker_pin = 4;
 int count_pin = 5;
+int button_pin = 6;
 int right_blue_eye_pin = 8;
 int right_red_eye_pin = 10;
 int left_blue_eye_pin = 11;
@@ -43,7 +44,6 @@ int body_pin = 26;
 int left_arm_pin = 28;
 int right_arm_pin = 30;
 int prox_sensor_pin = A2;
-int speaker_pin = 4;
 
 // POSITIONS
 // HEAD
@@ -80,12 +80,14 @@ unsigned long time_to_blink;
 // STATUS
 boolean sleep = true;
 boolean autom = false;
+boolean count_state = LOW;
+boolean count_state_prev = LOW;
+boolean button_state = LOW;
+boolean button_state_prev = LOW;
 
 // MISCELANEOUS
 int step_move_prog = 5;
 int step_move_free = 10;
-int count_state = 0;
-int count_state_prev = 0;
 float prox_sensor;
 
 // SOUND
@@ -185,7 +187,7 @@ void setup_bluetooth() {
     Serial1.print("\r\n+STOAUT=1\r\n");      // Permit Paired device to connect me
     Serial1.print("\r\n+STAUTO=0\r\n");      // Auto-connection should be forbidden here
     delay(2000);                             // This delay is required.
-    Serial1.print("\r\n+INQ=1\r\n");         // Make the slave inquirable 
+    Serial1.print("\r\n+INQ=1\r\n");         // Make the slave inquirable
     delay(2000);                             // This delay is required.
     while (Serial1.available()) {            // Clear data
         delay(50);
@@ -197,6 +199,18 @@ void setup_bluetooth() {
 // FUNCTIONS (BASIC)                                                          //
 //----------------------------------------------------------------------------//
 
+void play_tone(int sound) {
+    int note;
+    if (sound == 0) {
+        note = NOTE_C4;
+    } else {
+        note = NOTE_C6;
+    }
+    tone(speaker_pin, note, 200);
+    delay(300);
+    noTone(speaker_pin);
+}
+
 void play_sound(int sound) {
     // SOUND:
     // 0 = TA-TA-TA-TA TA-TA
@@ -205,7 +219,7 @@ void play_sound(int sound) {
     // 3 = JAMES BOND
     int eyes = 0;
     for (int thisNote = 0; thisNote < sound_num[sound]; thisNote++) {
-        // to calculate the note duration, take one second 
+        // to calculate the note duration, take one second
         // divided by the note type.
         // e.g. quarter note = 1000 / 4, eighth note = 1000/8, etc.
         int noteDuration = 1000/sound_durat[sound][thisNote];
@@ -285,6 +299,18 @@ void check_count() {
     }
 }
 
+void check_button() {
+    button_state = digitalRead(button_pin);
+
+    if (button_state != button_state_prev) {
+        button_state_prev = button_state;
+
+        if (button_state == HIGH) {
+            change_autom();
+        }
+    }
+}
+
 void check_serial() {
     boolean ok = false;
     char read_aux1;
@@ -320,7 +346,7 @@ void check_serial() {
             char_num++;
         }
     }
-    
+
     if (option != 999) {
         execute_option(option, parameter);
     }
@@ -376,6 +402,15 @@ void change_sleep() {
         set_eyes(254, 254, 255, 255);
     }
     sleep=!sleep;
+}
+
+void change_autom() {
+    if (autom) {
+        play_tone(0);
+    } else {
+        play_tone(1);
+    }
+    autom=!autom;
 }
 
 void move(int time, int pos1, int new_pos1, int pos2, int new_pos2, int pos3, int new_pos3, int pos4, int new_pos4) {
@@ -974,7 +1009,7 @@ void move_dance() {
         body1 = body2;
         right_arm1 = right_arm2;
         left_arm1 = left_arm2;
- 
+
         body2 = step_move_prog * random(int(100 / step_move_prog + 1), int(130 / step_move_prog + 1));
         head2 = 90 + 2 * (90 - body2);
         right_arm2 = step_move_prog * random(int(100 / step_move_prog + 1), int(160 / step_move_prog + 1));
@@ -989,8 +1024,8 @@ void move_dance() {
         left_arm1 = left_arm2;
  }
 
-    analogWrite(right_blue_eye_pin, 240);  
-    analogWrite(left_blue_eye_pin, 240);         
+    analogWrite(right_blue_eye_pin, 240);
+    analogWrite(left_blue_eye_pin, 240);
 
     move(40, head1, 90, body1, 90, left_arm1, 70, right_arm1, 90);
     delay(500);
@@ -1223,7 +1258,7 @@ void move_count(int number) {
     int head_pos = map(number/100, 0, 3, head_avg, head_min);
     int right_arm_pos =  map(number%100/10, 0, 9, right_arm_min, right_arm_max);
     int left_arm_pos = map(number%10, 0, 9, left_arm_min, left_arm_max);
-    
+
     set_eyes(100, 100, 255, 255);
 
     motor1.write(head_pos);
@@ -1250,7 +1285,7 @@ void execute_option(int option, int parameter) {
 
     switch (option) {
         case 1:
-            autom=!autom;
+            change_autom();
             break;
         case 2:
             move_happy();
@@ -1399,6 +1434,7 @@ void loop() {
 
     check_proximity();
     check_count();
+    check_button();
     check_serial();
     check_bluetooth();
 
@@ -1410,4 +1446,3 @@ void loop() {
         }
     }
 }
-
